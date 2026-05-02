@@ -1,3 +1,5 @@
+from datetime import date  # Добавь в начало файла
+from datetime import date  # Не забудь импорт в начале файла
 from schemas import TPUpdate
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
@@ -11,7 +13,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import TP, Section, Subscriber, Bus
 from schemas import TPUpdate, TPRead, TPRead, TPUpdate
-
+from datetime import date
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
@@ -88,34 +90,59 @@ def update_tp(
     if not db_tp:
         raise HTTPException(status_code=404, detail="ТП не найдена")
 
-    # Обновляем поля самой ТП
+    # 1. Обработка даты (конвертация строки в объект date)
+    if "commissioning_date" in tp_data and isinstance(
+        tp_data
+        ["commissioning_date"],
+            str):
+        try:
+            tp_data["commissioning_date"] = date.fromisoformat(
+                tp_data["commissioning_date"])
+        except ValueError:
+            pass
+
+    # 2. Обновляем основные поля ТП
     for key, value in tp_data.items():
         if key != "sections" and hasattr(db_tp, key):
             setattr(db_tp, key, value)
 
-    # Перезаписываем вложенную структуру
+    # 3. Полная перезапись структуры секций, абонентов и шин
     if "sections" in tp_data:
-        for old_sec in db_tp.sections:
-            session.delete(old_sec)
+        # УДАЛЕНИЕ: Чистим всё старое дерево связей этой ТП
+        for section in db_tp.sections:
+            for sub in section.subscribers:
+                for bus in sub.buses:
+                    session.delete(bus)
+                session.delete(sub)
+            session.delete(section)
+
+        # Сбрасываем изменения в БД перед вставкой новых данных
         session.flush()
 
+        # ВСТАВКА: Создаем новую структуру с чистого листа
         for s_data in tp_data["sections"]:
-            subs = s_data.pop("subscribers", [])
-            s_data.pop("id", None)  # Убираем старый ID для новой вставки
-            db_sec = Section(**s_data, tp=db_tp)
-            session.add(db_sec)
+            subs_data = s_data.pop("subscribers", [])
+            s_data.pop("id", None)  # Игнорируем старые ID
 
-            for sub_data in subs:
-                buses = sub_data.pop("buses", [])
-                sub_data.pop("id", None)
-                db_sub = Subscriber(**sub_data, section=db_sec)
-                session.add(db_sub)
+            db_section = Section(**s_data, tp=db_tp)
+            session.add(db_section)
+            session.flush()  # Получаем новый ID секции
 
-                for b_data in buses:
-                    b_data.pop("id", None)
-                    db_bus = Bus(**b_data, subscriber=db_sub)
+            for sub_data in subs_data:
+                buses_data = sub_data.pop("buses", [])
+                sub_data.pop("id", None)  # Игнорируем старые ID
+
+                db_subscriber = Subscriber(
+                    **sub_data, section_id=db_section.id)
+                session.add(db_subscriber)
+                session.flush()  # Получаем новый ID абонента
+
+                for bus_data in buses_data:
+                    bus_data.pop("id", None)  # Игнорируем старые ID
+                    db_bus = Bus(**bus_data, subscriber_id=db_subscriber.id)
                     session.add(db_bus)
 
+    # 4. Финальное сохранение
     session.commit()
     session.refresh(db_tp)
     return db_tp

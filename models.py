@@ -63,4 +63,7 @@ class TP(SQLModel, table=True):
     transformer_type: str
     uspd_type: str  # Тип УСПД
 
-    sections: List[Section] = Relationship(back_populates="tp")
+    sections: List["Section"] = Relationship(
+        back_populates="tp",
+        cascade_delete=True
+    )
