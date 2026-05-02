@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from ui_components import tp_fields, subscriber_fields
+from ui_components import tp_fields, subscriber_fields, bus_fields
 
 API_URL = "http://127.0.0.1:8000"
 
@@ -107,6 +107,30 @@ for tp in tps:
                                 st.rerun()
                             sub = subscriber_fields(
                                 sub, key_prefix=f"e_sub_{tp['id']}_{s_idx}_{a_idx}")
+                        st.markdown("#### 🔗 Шины")
+
+                        # Список существующих шин
+                        for b_idx, bus in enumerate(sub.get('buses', [])):
+                            # Вызываем компонент и получаем колонку для кнопки
+                            # удаления
+                            del_col = bus_fields(
+                                bus, key_prefix=f"eb_{tp['id']}_{s_idx}_{a_idx}_{b_idx}")
+
+                            if del_col.form_submit_button(
+                                    "❌", key=f"db_{tp['id']}_{s_idx}_{a_idx}_{b_idx}"):
+                                sub['buses'].pop(b_idx)
+                                st.rerun()
+
+                        # Кнопка добавления новой шины (ВНЕ формы абонента, но
+                        # внутри цикла)
+                        if st.form_submit_button(
+                            f"➕ Добавить шину",
+                                key=f"ab_{tp['id']}_{s_idx}_{a_idx}"):
+                            if 'buses' not in sub:
+                                sub['buses'] = []
+                            sub['buses'].append(
+                                {"bus_type": "", "bus_count": 1})
+                            st.rerun()
 
                 bc1, bc2 = st.columns(2)
                 if bc1.form_submit_button(
