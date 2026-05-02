@@ -67,3 +67,10 @@ class TP(SQLModel, table=True):
         back_populates="tp",
         cascade_delete=True
     )
+
+
+class Reference(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    category: str = Field(index=True)  # 'TT', 'PU', 'Bus', 'Panel', 'USPD'
+    # Название, например '200/5' или 'Меркурий 230'
+    value: str = Field(unique=True)

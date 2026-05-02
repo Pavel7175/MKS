@@ -8,14 +8,13 @@ API_URL = "http://127.0.0.1:8000"
 st.set_page_config(page_title="Реестр ТП", layout="wide")
 st.title("📋 Реестр и управление ТП")
 
+# --- Инициализация состояния ---
 if "edit_mode" not in st.session_state:
     st.session_state.edit_mode = None
 if "edit_data" not in st.session_state:
     st.session_state.edit_data = {}
 
-search_query = st.text_input(
-    "🔍 Поиск по номеру ТП",
-    placeholder="Например: ТП-500")
+search_query = st.text_input("🔍 Быстрый поиск по номеру ТП")
 
 url = f"{API_URL}/tps/by-number/{search_query}" if search_query else f"{API_URL}/tps/"
 try:
@@ -26,111 +25,141 @@ try:
         tps = [data] if isinstance(data, dict) else data
 except BaseException:
     tps = []
+
+# --- Основной цикл отрисовки ---
 for tp in tps:
-    is_editing = st.session_state.edit_mode == tp['id']
-    with st.expander(f"🏢 {tp['tp_number']} — {tp['address']}", expanded=is_editing):
+    tp_id = tp['id']
+    is_editing = st.session_state.edit_mode == tp_id
+
+    with st.expander(f"🏢 {tp['tp_number']} — {tp['address']}", expanded=is_editing or bool(search_query)):
         if not is_editing:
-            # Просмотр ТП
+            # --- ПРОСМОТР ---
             c1, c2, c3 = st.columns(3)
             c1.write(f"**Район/Округ:** {tp['district']} / {tp['region']}")
             c2.write(f"**Трансформатор:** {tp['transformer_type']}")
             c3.write(
                 f"**УСПД:** {tp['uspd_type']} | **Вкл:** {tp['commissioning_date']}")
 
-            if st.button("📝 Редактировать всё", key=f"btn_ed_{tp['id']}"):
-                st.session_state.edit_mode = tp['id']
+            if st.button("📝 Редактировать", key=f"view_edit_{tp_id}"):
+                st.session_state.edit_mode = tp_id
                 st.session_state.edit_data = tp.copy()
                 st.rerun()
 
             for sec in tp['sections']:
-                st.markdown(f"#### 📍 Луч: {sec['number']}")
-                for sub in sec['subscribers']:
-                    with st.container(border=True):
-                        st.write(f"👤 **{sub['name']}** (№{sub['number']})")
-                        sa1, sa2, sa3 = st.columns(3)
-                        sa1.write(
-                            f"**Кабель:** {sub['cable_brand']} ({sub['cable_length']}м)")
-                        sa2.write(
-                            f"**ТТ:** {sub['ct_type']} ({sub['ct_rating']})")
-                        sa3.write(f"**ПУ:** {sub['meter_type']}")
-                        if sub.get('buses'):
-                            st.caption("🔗 Шины:")
-                            st.table(pd.DataFrame(sub['buses'])[
-                                     ['bus_type', 'bus_count']])
+                with st.expander(f"📍 Луч: {sec['number']} (Панель: {sec['panel']})"):
+                    st.write(f"**Тип сборки:** {sec['assembly_type']}")
+                    for sub in sec['subscribers']:
+                        with st.container(border=True):
+                            st.write(f"👤 **{sub['number']}** ({sub['name']})")
+
+                            st.caption(
+                                f"ТТ: {sub['ct_type']} ({sub['ct_rating']}) | ПУ: {sub['meter_type']}")
+                            if sub.get('buses'):
+                                bus_list = [
+                                    f"{b['bus_type']} ({b['bus_count']} шт.)"
+                                    for b in sub['buses']
+                                    if b.get('bus_type')]
+                                if bus_list:
+                                    bus_str = ", ".join(bus_list)
+                                    st.caption(f"**Шины:** {bus_str}")
+
         else:
-            # --- РЕЖИМ РЕДАКТИРОВАНИЯ ---
+            # --- РЕДАКТИРОВАНИЕ ---
+            st.warning(f"🛠 Редактирование {tp['tp_number']}")
             ed = st.session_state.edit_data
-            if st.button("➕ Добавить новый Луч", key=f"as_{tp['id']}"):
+
+            if st.button("➕ Добавить новый Луч", key=f"add_sec_{tp_id}"):
                 ed['sections'].append(
                     {"number": "Новый", "assembly_type": "", "panel": "",
                      "subscribers": []})
                 st.rerun()
 
-            with st.form(f"f_ed_{tp['id']}"):
-                ed = tp_fields(ed)
+            with st.form(f"f_edit_{tp_id}"):
+                ed = tp_fields(ed)  # Поля ТП
+
                 for s_idx, sec in enumerate(ed['sections']):
-                    st.divider()
-                    col_h, col_d = st.columns([0.9, 0.1])
-                    col_h.subheader(f"Луч: {sec['number']}")
-                    if col_d.form_submit_button(
-                            "🗑️", key=f"del_sec_{tp['id']}_{s_idx}"):
-                        ed['sections'].pop(s_idx)
-                        st.rerun()
+                    with st.expander(f"📍 Луч: {sec['number']}", expanded=True):
+                        c_h, c_d = st.columns([0.9, 0.1])
+                        sec['number'] = c_h.text_input(
+                            "Название луча", value=sec['number'],
+                            key=f"esn_{tp_id}_{s_idx}")
+                        if c_d.form_submit_button(
+                                "🗑️", key=f"ds_{tp_id}_{s_idx}"):
+                            ed['sections'].pop(s_idx)
+                            st.rerun()
 
-                    sec['number'] = st.text_input(
-                        "Имя луча", value=sec['number'],
-                        key=f"sn_{tp['id']}_{s_idx}")
+                        # ДОБАВИЛИ ПАНЕЛЬ И СБОРКУ
+                        cs1, cs2 = st.columns(2)
+                        sec['assembly_type'] = cs1.text_input(
+                            "Тип сборки", value=sec['assembly_type'], key=f"esa_{tp_id}_{s_idx}")
+                        sec['panel'] = cs2.text_input(
+                            "Панель", value=sec['panel'],
+                            key=f"esp_{tp_id}_{s_idx}")
 
-                    for a_idx, sub in enumerate(sec['subscribers']):
-                        with st.container(border=True):
-                            sub = subscriber_fields(
-                                sub, key_prefix=f"esub_{tp['id']}_{s_idx}_{a_idx}")
-
-                            # --- БЛОК ШИН (ИСПРАВЛЕНО) ---
-                            st.write("🔗 **Шины абонента**")
-                            if st.form_submit_button(
-                                f"➕ Добавить шину абоненту {a_idx}",
-                                    key=f"ab_{tp['id']}_{s_idx}_{a_idx}"):
-                                sub.setdefault(
-                                    'buses', []).append(
-                                    {"bus_type": "", "bus_count": 1})
-                                st.rerun()
-
-                            for b_idx, bus in enumerate(sub.get('buses', [])):
-                                bc1, bc2, bc3 = st.columns([0.6, 0.3, 0.1])
-                                bus['bus_type'] = bc1.text_input(
-                                    "Тип", value=bus['bus_type'], key=f"bt_{tp['id']}_{s_idx}_{a_idx}_{b_idx}")
-                                bus['bus_count'] = bc2.number_input(
-                                    "Кол-во", value=int(bus['bus_count']),
-                                    key=f"bc_{tp['id']}_{s_idx}_{a_idx}_{b_idx}")
-                                if bc3.form_submit_button(
-                                        "❌", key=f"db_{tp['id']}_{s_idx}_{a_idx}_{b_idx}"):
-                                    sub['buses'].pop(b_idx)
+                        for a_idx, sub in enumerate(
+                                sec.get('subscribers', [])):
+                            with st.expander(f"👤 {sub['name'] if sub['name'] else 'Новый'}", expanded=False):
+                                if st.form_submit_button(
+                                    "❌ Удалить абонента",
+                                        key=f"dsub_{tp_id}_{s_idx}_{a_idx}"):
+                                    sec['subscribers'].pop(a_idx)
                                     st.rerun()
 
-                    if st.form_submit_button(
-                        f"👤 Добавить абонента в {sec['number']}",
-                            use_container_width=True):
-                        sec['subscribers'].append({"number": "",
-                                                   "name": "",
-                                                   "address": "",
-                                                   "fuse_rating": "",
-                                                   "cable_brand": "",
-                                                   "cable_length": 0.0,
-                                                   "ct_rating": "",
-                                                   "ct_type": "",
-                                                   "meter_type": "",
-                                                   "buses": []})
-                        st.rerun()
+                                sub = subscriber_fields(
+                                    sub, key_prefix=f"esub_{tp_id}_{s_idx}_{a_idx}")
 
-                if st.form_submit_button(
-                    "✅ СОХРАНИТЬ ВСЁ",
-                        use_container_width=True):
-                    res = requests.patch(f"{API_URL}/tps/{tp['id']}", json=ed)
+                                # --- ШИНЫ ВНУТРИ АБОНЕНТА ---
+                                st.write("🔗 **Шины**")
+                                if st.form_submit_button(
+                                        "➕ Добавить шину", key=f"ab_{tp_id}_{s_idx}_{a_idx}"):
+                                    sub.setdefault(
+                                        'buses', []).append(
+                                        {"bus_type": "", "bus_count": 1})
+                                    st.rerun()
+
+                                for b_idx, bus in enumerate(
+                                        sub.get('buses', [])):
+                                    bc1, bc2, bc3 = st.columns([0.6, 0.3, 0.1])
+                                    bus['bus_type'] = bc1.text_input(
+                                        "Тип шины", value=bus['bus_type'],
+                                        key=f"bt_{tp_id}_{s_idx}_{a_idx}_{b_idx}")
+                                    bus['bus_count'] = bc2.number_input(
+                                        "Кол-во",
+                                        value=int(
+                                            bus['bus_count']),
+                                        key=f"bc_{tp_id}_{s_idx}_{a_idx}_{b_idx}")
+                                    if bc3.form_submit_button(
+                                            "❌", key=f"db_{tp_id}_{s_idx}_{a_idx}_{b_idx}"):
+                                        sub['buses'].pop(b_idx)
+                                        st.rerun()
+
+                        if st.form_submit_button(
+                            f"👤 Добавить абонента",
+                            key=f"asb_{tp_id}_{s_idx}",
+                                use_container_width=True):
+                            sec['subscribers'].append(
+                                {
+                                    "number": "",
+                                    "name": "",
+                                    "address": "",
+                                    "fuse_rating": "",
+                                    "cable_brand": "",
+                                    "cable_length": 0.0,
+                                    "ct_rating": "",
+                                    "ct_type": "",
+                                    "meter_type": "",
+                                    "buses": []})
+                            st.rerun()
+
+                sc1, sc2 = st.columns(2)
+                if sc1.form_submit_button(
+                        "✅ СОХРАНИТЬ", use_container_width=True):
+                    res = requests.patch(f"{API_URL}/tps/{tp_id}", json=ed)
                     if res.status_code == 200:
                         st.success("Обновлено!")
                         st.session_state.edit_mode = None
                         st.rerun()
-                if st.form_submit_button("❌ ОТМЕНА", use_container_width=True):
+                if sc2.form_submit_button(
+                        "❌ ОТМЕНА", use_container_width=True):
                     st.session_state.edit_mode = None
                     st.rerun()

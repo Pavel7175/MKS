@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, create_engine, Session
 # Импортируем модели, чтобы SQLModel зарегистрировал их в метаданных
-from models import TP, Section, Subscriber, Bus  # noqa
+from models import TP, Section, Subscriber, Bus, Reference  # noqa
 
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
