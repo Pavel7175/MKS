@@ -1,0 +1,26 @@
+# Виртуальные окружения
+venv/
+env/
+ENV/
+.env
+
+# Кэш Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Настройки VS Code и локальные папки
+.vscode/
+.idea/
+.DS_Store
+
+# Файлы переменных окружения (с паролями и ключами)
+.env
+*.env
+
+# Распределенные системы и логи
+*.log
+build/
+dist/
+*.egg-info/
+*.db

@@ -1,0 +1,9 @@
+fastapi[all]
+sqlmodel
+alembic
+asyncpg
+aiosqlite
+pandas
+openpyxl
+streamlit
+requests

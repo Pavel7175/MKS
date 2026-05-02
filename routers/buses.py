@@ -1,0 +1,28 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+from database import get_session
+from models import Bus
+from schemas import BusCreate, BusRead
+
+router = APIRouter(prefix="/buses", tags=["Шины"])
+
+
+@router.post("/", response_model=BusRead)
+def create_bus(bus_data: BusCreate, subscriber_id: int,
+               session: Session = Depends(get_session)):
+    # Проверяем, существует ли абонент (опционально, для надежности)
+    db_bus = Bus(**bus_data.dict(), subscriber_id=subscriber_id)
+    session.add(db_bus)
+    session.commit()
+    session.refresh(db_bus)
+    return db_bus
+
+
+@router.delete("/{bus_id}")
+def delete_bus(bus_id: int, session: Session = Depends(get_session)):
+    bus = session.get(Bus, bus_id)
+    if not bus:
+        raise HTTPException(status_code=404, detail="Шина не найдена")
+    session.delete(bus)
+    session.commit()
+    return {"ok": True}
