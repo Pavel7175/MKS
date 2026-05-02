@@ -10,7 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
 from models import TP, Section, Subscriber, Bus
-from schemas import TPUpdate, TPRead
+from schemas import TPUpdate, TPRead, TPRead, TPUpdate
+
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
@@ -87,34 +88,34 @@ def update_tp(
     if not db_tp:
         raise HTTPException(status_code=404, detail="ТП не найдена")
 
-    # Обновляем основные поля ТП
+    # Обновляем поля самой ТП
     for key, value in tp_data.items():
         if key != "sections" and hasattr(db_tp, key):
             setattr(db_tp, key, value)
 
-    # Работа со вложенными данными
+    # Перезаписываем вложенную структуру
     if "sections" in tp_data:
-        # 1. Удаляем абсолютно все старые связи этой ТП (каскадно)
-        # Это гарантирует, что старые данные не "всплывут"
-        for section in db_tp.sections:
-            session.delete(section)
+        for old_sec in db_tp.sections:
+            session.delete(old_sec)
         session.flush()
 
-        # 2. Записываем новые данные из формы
-        for sec_data in tp_data["sections"]:
-            subs_data = sec_data.pop("subscribers", [])
-            new_sec = Section(**sec_data, tp=db_tp)
-            session.add(new_sec)
+        for s_data in tp_data["sections"]:
+            subs = s_data.pop("subscribers", [])
+            s_data.pop("id", None)  # Убираем старый ID для новой вставки
+            db_sec = Section(**s_data, tp=db_tp)
+            session.add(db_sec)
 
-            for sub_data in subs_data:
-                buses_data = sub_data.pop("buses", [])
-                new_sub = Subscriber(**sub_data, section=new_sec)
-                session.add(new_sub)
+            for sub_data in subs:
+                buses = sub_data.pop("buses", [])
+                sub_data.pop("id", None)
+                db_sub = Subscriber(**sub_data, section=db_sec)
+                session.add(db_sub)
 
-                for bus_data in buses_data:
-                    new_bus = Bus(**bus_data, subscriber=new_sub)
-                    session.add(new_bus)
+                for b_data in buses:
+                    b_data.pop("id", None)
+                    db_bus = Bus(**b_data, subscriber=db_sub)
+                    session.add(db_bus)
 
     session.commit()
-    session.refresh(db_tp)  # Обновляем объект из базы перед возвратом
+    session.refresh(db_tp)
     return db_tp
