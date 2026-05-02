@@ -109,6 +109,18 @@ for tp in tps:
                                 sub, key_prefix=f"e_sub_{tp['id']}_{s_idx}_{a_idx}")
                         st.markdown("#### 🔗 Шины")
 
+                    # Кнопка добавления абонента ВНУТРИ цикла секций, сразу
+                    # после абонентов
+                    if st.form_submit_button(
+                        f"👤 Добавить абонента в {sec['number']}",
+                            use_container_width=True):
+                        sec['subscribers'].append({
+                            "number": "", "name": "", "address": "", "fuse_rating": "",
+                            "cable_brand": "", "cable_length": 0.0, "ct_rating": "",
+                            "ct_type": "", "meter_type": "", "buses": []
+                        })
+                        st.rerun()
+
                         # Список существующих шин
                         for b_idx, bus in enumerate(sub.get('buses', [])):
                             # Вызываем компонент и получаем колонку для кнопки
@@ -143,20 +155,4 @@ for tp in tps:
                 if bc2.form_submit_button(
                         "❌ ОТМЕНА", use_container_width=True):
                     st.session_state.edit_mode = None
-                    st.rerun()
-
-            for s_idx, sec in enumerate(ed['sections']):
-                if st.button(
-                    f"👤 Добавить абонента в {sec['number']}",
-                        key=f"add_sub_btn_{tp['id']}_{s_idx}"):
-                    sec['subscribers'].append({"number": "",
-                                               "name": "",
-                                               "address": "",
-                                               "fuse_rating": "",
-                                               "cable_brand": "",
-                                               "cable_length": 0.0,
-                                               "ct_rating": "",
-                                               "ct_type": "",
-                                               "meter_type": "",
-                                               "buses": []})
                     st.rerun()
