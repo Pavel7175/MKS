@@ -57,3 +57,15 @@ def subscriber_fields(sub, key_prefix):
         "Тип ПУ", value=sub.get('meter_type', ""),
         key=f"{key_prefix}_mt")
     return sub
+
+
+def bus_fields(bus, key_prefix):
+    """Поля для одной шины"""
+    bc1, bc2, bc3 = st.columns([0.6, 0.3, 0.1])
+    bus['bus_type'] = bc1.text_input(
+        "Тип шины", value=bus.get('bus_type', ""),
+        key=f"{key_prefix}_type")
+    bus['bus_count'] = bc2.number_input(
+        "Кол-во", value=int(bus.get('bus_count', 1)),
+        min_value=1, key=f"{key_prefix}_cnt")
+    return bc3  # Возвращаем колонку для кнопки удаления
