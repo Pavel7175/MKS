@@ -5,59 +5,50 @@ API_URL = "http://127.0.0.1:8000"
 
 
 def render_editable_selectbox(label, category, current_value, key):
-    """Выпадающий список, работающий с твоим роутером /refs/"""
+    # 1. Получаем текущий список из базы
     options = []
-    category_key = category.upper()
-
     try:
-        # Запрос к твоему эндпоинту @router.get("/{category}")
-        response = requests.get(f"{API_URL}/refs/{category_key}")
+        response = requests.get(f"{API_URL}/refs/{category.upper()}")
         if response.status_code == 200:
             options = response.json()
     except BaseException:
         pass
 
-    # Если база пустая, выводим заглушку
-    if not options:
-        options = ["-- База пуста --"]
+    # 2. Формируем список для выбора
+    # Добавляем текущее значение в начало, если оно уже есть в базе
+    if current_value and current_value not in options:
+        options.insert(0, current_value)
 
-    display_options = options + ["➕ Добавить новое..."]
+    # Добавляем опцию ручного ввода в конец
+    display_options = options + ["➕ Ввести вручную..."]
 
-    # Пытаемся найти текущее значение в списке для корректного отображения
-    start_idx = 0
-    if current_value in options:
-        start_idx = options.index(current_value)
+    # Пытаемся выставить индекс на текущее значение
+    try:
+        start_idx = options.index(
+            current_value) if current_value in options else 0
+    except BaseException:
+        start_idx = 0
 
+    # 3. Рисуем селектбокс
     selected = st.selectbox(
         label,
         options=display_options,
         index=start_idx,
         key=f"sel_{key}")
 
-    # Если пользователь хочет добавить новое значение
-    if selected == "➕ Добавить новое...":
-        new_val = st.text_input(
-            f"Новое значение для '{label}'",
-            key=f"input_{key}")
-        if st.button("Сохранить в справочник", key=f"btn_{key}"):
-            if new_val:
-                # Запрос к твоему эндпоинту @router.post("/")
-                payload = {"category": category_key, "value": new_val}
-                res = requests.post(f"{API_URL}/refs/", json=payload)
-                if res.status_code == 200:
-                    st.success(f"'{new_val}' сохранено!")
-                    st.rerun()
-                else:
-                    st.error("Ошибка при сохранении")
-        return current_value
+    # 4. ЛОГИКА ВВОДА: если выбрано "Ввести вручную", показываем поле ввода
+    if selected == "➕ Ввести вручную...":
+        manual_val = st.text_input(
+            f"Введите {label} (новое)",
+            key=f"manual_input_{key}")
+        return manual_val  # Возвращаем то, что вписали руками
 
-    return selected if selected != "-- База пуста --" else ""
+    return selected
 
 
 def tp_fields(data=None):
     res = data or {}
     c1, c2, c3 = st.columns(3)
-
     res['address'] = c1.text_input("Адрес ТП", value=res.get('address', ""))
     res['district'] = c1.text_input("Район", value=res.get('district', ""))
     res['region'] = c2.text_input("Округ", value=res.get('region', ""))
@@ -68,7 +59,7 @@ def tp_fields(data=None):
         "Тип трансформатора", value=res.get(
             'transformer_type', ""))
 
-    # СПРАВОЧНИК: УСПД
+    # --- ВЫПАДАЮЩИЙ СПИСОК УСПД ---
     res['uspd_type'] = render_editable_selectbox(
         "Тип УСПД", "USPD", res.get('uspd_type', ""), "tp_uspd")
     return res
@@ -79,7 +70,7 @@ def section_fields(sec, key_prefix):
     sec['number'] = c1.text_input(
         "Название луча", value=sec.get(
             'number', ""), key=f"{key_prefix}_sn")
-    # СПРАВОЧНИК: ПАНЕЛЬ
+    # --- ВЫПАДАЮЩИЙ СПИСОК ПАНЕЛЬ ---
     sec['panel'] = render_editable_selectbox(
         "Панель", "PANEL", sec.get(
             'panel', ""), f"{key_prefix}_p")
@@ -114,7 +105,7 @@ def subscriber_fields(sub, key_prefix):
                 0)),
         key=f"{key_prefix}_l")
 
-    # СПРАВОЧНИКИ: ТТ
+    # --- ВЫПАДАЮЩИЕ СПИСКИ ТТ ---
     sub['ct_type'] = render_editable_selectbox(
         "Тип ТТ", "TT_TYPE", sub.get(
             'ct_type', ""), f"{key_prefix}_ctt")
@@ -130,7 +121,7 @@ def subscriber_fields(sub, key_prefix):
 
 def bus_fields(bus, key_prefix):
     bc1, bc2, bc3 = st.columns([0.6, 0.3, 0.1])
-    # СПРАВОЧНИК: ТИП ШИНЫ
+    # --- ВЫПАДАЮЩИЙ СПИСОК ШИНЫ ---
     bus['bus_type'] = render_editable_selectbox(
         "Тип шины", "BUS_TYPE", bus.get(
             'bus_type', ""), f"{key_prefix}_bt")

@@ -11,6 +11,7 @@ categories = {
     "Типы ТТ": "TT_TYPE",
     "Номиналы ТТ": "TT_RATING",
     "Типы шин": "BUS_TYPE",
+    "Типы счетчиков": "PU_TYPE",
     "Панели": "PANEL"
 }
 

@@ -14,12 +14,14 @@ from database import get_session
 from models import TP, Section, Subscriber, Bus
 from schemas import TPUpdate, TPRead, TPRead, TPUpdate
 from datetime import date
+from utils import sync_references
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
 @router.post("/", response_model=TPRead)
 def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
     # 1. Создаем объект ТП
+    sync_references(tp_data.dict(), session)
     db_tp = TP(**tp_data.dict(exclude={"sections"}))
 
     # 2. Обходим секции
@@ -86,6 +88,7 @@ def update_tp(
         tp_id: int,
         tp_data: dict,
         session: Session = Depends(get_session)):
+    sync_references(tp_data.dict(), session)
     db_tp = session.get(TP, tp_id)
     if not db_tp:
         raise HTTPException(status_code=404, detail="ТП не найдена")
