@@ -1,12 +1,41 @@
 import streamlit as st
 import requests
 import pandas as pd
-from ui_components import tp_fields, subscriber_fields
+from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
+import uuid
+
 
 API_URL = "http://127.0.0.1:8000"
 
+# 1. ПЕРВЫМ ДЕЛОМ КОНФИГУРАЦИЯ
 st.set_page_config(page_title="Реестр ТП", layout="wide")
 st.title("📋 Реестр и управление ТП")
+
+# 2. ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ
+if "page" not in st.session_state:
+    st.session_state.page = 0
+
+# 3. ЛОГИКА ПАГИНАЦИИ
+limit = 10
+offset = st.session_state.page * limit
+
+# 4. ВЫВОД КНОПОК НАВИГАЦИИ
+col1, col2, col3 = st.columns([1, 2, 1])
+if col1.button("⬅️ Назад", disabled=(st.session_state.page == 0)):
+    st.session_state.page -= 1
+    st.rerun()
+
+col2.write(f"Центр: Страница {st.session_state.page + 1}")
+
+if col3.button("Вперед ➡️"):
+    st.session_state.page += 1
+    st.rerun()
+
+# 5. ЗАПРОС К API
+# Теперь параметры offset и limit полетят в роутер
+url = f"{API_URL}/tps/?offset={offset}&limit={limit}"
+res = requests.get(url)
+tps = res.json() if res.status_code == 200 else []
 
 # --- Инициализация состояния ---
 if "edit_mode" not in st.session_state:
@@ -16,16 +45,24 @@ if "edit_data" not in st.session_state:
 
 search_query = st.text_input("🔍 Быстрый поиск по номеру ТП")
 
-url = f"{API_URL}/tps/by-number/{search_query}" if search_query else f"{API_URL}/tps/"
+if search_query:
+    url = f"{API_URL}/tps/by-number/{search_query}"
+else:
+    # Используем пагинацию, только если нет поиска
+    url = f"{API_URL}/tps/?offset={offset}&limit={limit}"
+
+if len(tps) < limit and not search_query:
+    st.info("Вы дошли до конца списка")
 try:
     res = requests.get(url)
-    tps = []
     if res.status_code == 200:
         data = res.json()
+        # Если пришел один объект (из поиска), кладем его в список
         tps = [data] if isinstance(data, dict) else data
+    else:
+        tps = []
 except BaseException:
     tps = []
-
 # --- Основной цикл отрисовки ---
 for tp in tps:
     tp_id = tp['id']
@@ -79,22 +116,16 @@ for tp in tps:
 
                 for s_idx, sec in enumerate(ed['sections']):
                     with st.expander(f"📍 Луч: {sec['number']}", expanded=True):
+
                         c_h, c_d = st.columns([0.9, 0.1])
-                        sec['number'] = c_h.text_input(
-                            "Название луча", value=sec['number'],
-                            key=f"esn_{tp_id}_{s_idx}")
                         if c_d.form_submit_button(
                                 "🗑️", key=f"ds_{tp_id}_{s_idx}"):
                             ed['sections'].pop(s_idx)
                             st.rerun()
 
                         # ДОБАВИЛИ ПАНЕЛЬ И СБОРКУ
-                        cs1, cs2 = st.columns(2)
-                        sec['assembly_type'] = cs1.text_input(
-                            "Тип сборки", value=sec['assembly_type'], key=f"esa_{tp_id}_{s_idx}")
-                        sec['panel'] = cs2.text_input(
-                            "Панель", value=sec['panel'],
-                            key=f"esp_{tp_id}_{s_idx}")
+                        sec = section_fields(
+                            sec, key_prefix=f"es_{tp_id}_{s_idx}")
 
                         for a_idx, sub in enumerate(
                                 sec.get('subscribers', [])):
@@ -117,20 +148,49 @@ for tp in tps:
                                         {"bus_type": "", "bus_count": 1})
                                     st.rerun()
 
-                                for b_idx, bus in enumerate(
-                                        sub.get('buses', [])):
-                                    bc1, bc2, bc3 = st.columns([0.6, 0.3, 0.1])
-                                    bus['bus_type'] = bc1.text_input(
-                                        "Тип шины", value=bus['bus_type'],
-                                        key=f"bt_{tp_id}_{s_idx}_{a_idx}_{b_idx}")
-                                    bus['bus_count'] = bc2.number_input(
-                                        "Кол-во",
-                                        value=int(
-                                            bus['bus_count']),
-                                        key=f"bc_{tp_id}_{s_idx}_{a_idx}_{b_idx}")
+                                # for b_idx, bus in enumerate(
+                                #         sub.get('buses', [])):
+                                #     # Вызываем готовую функцию, которая уже
+                                #     # умеет делать выпадающий список
+                                #     bc3 = bus_fields(
+                                # bus,
+                                # key_prefix=f"eb_{tp_id}_{s_idx}_{a_idx}_{b_idx}")
+
+                                #     if bc3.form_submit_button(
+                                #             "❌", key=f"db_{tp_id}_{s_idx}_{a_idx}_{b_idx}"):
+                                #         # Находим и удаляем именно этот объект
+                                #         # шины
+                                #         bus_to_delete = sub['buses'][b_idx]
+                                #         sub['buses'].remove(bus_to_delete)
+                                #         st.rerun()
+
+                                if "buses" not in sub:
+                                    sub["buses"] = []
+
+                                # 1. Присваиваем каждой шине постоянный скрытый
+                                # ID, если его нет
+                                for bus in sub["buses"]:
+                                    if "_id" not in bus:
+                                        bus["_id"] = str(uuid.uuid4())
+
+                                # 2. Отрисовка
+                                # Используем list() для создания копии списка
+                                # на время итерации
+                                for bus in list(sub["buses"]):
+                                    b_unique_id = bus["_id"]
+
+                                    # Передаем уникальный ID в функцию полей
+                                    bc3 = bus_fields(
+                                        bus, key_prefix=f"bus_{b_unique_id}")
+
+                                    # Кнопка удаления привязана к конкретному
+                                    # ID, а не к позиции в списке
                                     if bc3.form_submit_button(
-                                            "❌", key=f"db_{tp_id}_{s_idx}_{a_idx}_{b_idx}"):
-                                        sub['buses'].pop(b_idx)
+                                            "❌", key=f"del_{b_unique_id}"):
+                                        # Удаляем из оригинального списка
+                                        # именно эту шину по её ID
+                                        sub['buses'] = [
+                                            b for b in sub['buses'] if b.get('_id') != b_unique_id]
                                         st.rerun()
 
                         if st.form_submit_button(

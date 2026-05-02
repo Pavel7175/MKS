@@ -15,6 +15,7 @@ def sync_references(data: dict, session: Session):
         "meter_type": "PU_TYPE",
         "panel": "PANEL",
         "bus_type": "BUS_TYPE",
+        "assembly_type": "ASSEMBLY",
     }
 
     def process_node(node):

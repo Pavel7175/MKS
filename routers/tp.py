@@ -15,6 +15,8 @@ from models import TP, Section, Subscriber, Bus
 from schemas import TPUpdate, TPRead, TPRead, TPUpdate
 from datetime import date
 from utils import sync_references
+from fastapi import Query
+from sqlmodel import select, col
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
@@ -50,9 +52,18 @@ def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
 
 
 @router.get("/", response_model=list[TPRead])
-def read_tps(session: Session = Depends(get_session)):
-    # select(TP) автоматически подтянет вложенные данные благодаря Relationship
-    tps = session.exec(select(TP)).all()
+def read_tps(
+    session: Session = Depends(get_session),
+    offset: int = 0,
+    limit: int = 20
+):
+    # Добавляем принудительную сортировку по ID
+    statement = select(TP).order_by(TP.id).offset(offset).limit(limit)
+
+    # Печатаем в консоль uvicorn для отладки
+    print(f"DEBUG: Запрос с offset={offset}, limit={limit}")
+
+    tps = session.exec(statement).all()
     return tps
 
 
@@ -88,7 +99,7 @@ def update_tp(
         tp_id: int,
         tp_data: dict,
         session: Session = Depends(get_session)):
-    sync_references(tp_data.dict(), session)
+    sync_references(tp_data, session)
     db_tp = session.get(TP, tp_id)
     if not db_tp:
         raise HTTPException(status_code=404, detail="ТП не найдена")
