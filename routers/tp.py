@@ -1,26 +1,14 @@
 import logging
 from datetime import date  # Добавь в начало файла
-from datetime import date  # Не забудь импорт в начале файла
-from schemas import TPUpdate
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 from database import get_session
 from models import TP, Section, Subscriber, Bus
 from schemas import TPCreate, TPRead
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from database import get_session
-from models import TP, Section, Subscriber, Bus
-from schemas import TPUpdate, TPRead, TPRead, TPUpdate
-from datetime import date
-from utils import sync_references
-from fastapi import Query
-from sqlmodel import select, col, desc
 from fastapi import HTTPException
+from utils import sync_references
+from sqlmodel import desc
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 

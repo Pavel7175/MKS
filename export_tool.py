@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlmodel import Session, select
 from database import engine
-from models import TP, Section, Subscriber, Bus
+from models import TP
 
 
 def export_to_excel(file_name="tp_export.xlsx"):

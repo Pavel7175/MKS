@@ -1,9 +1,7 @@
 import streamlit as st
 import requests
-import pandas as pd
 from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
 import uuid
-import streamlit as st
 if not st.session_state.get("logged_in"):
     st.switch_page("app.py")
 
@@ -289,7 +287,7 @@ for tp in tps_list:
                                         st.rerun()
 
                         if st.form_submit_button(
-                            f"👤 Добавить абонента",
+                            "👤 Добавить абонента",
                             key=f"asb_{tp_id}_{s_idx}",
                                 use_container_width=True):
                             sec['subscribers'].append(

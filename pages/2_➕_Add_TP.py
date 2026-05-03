@@ -3,7 +3,6 @@ import requests
 import copy
 import uuid
 from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
-import streamlit as st
 if not st.session_state.get("logged_in"):
     st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
@@ -120,7 +119,7 @@ with st.form("add_tp_form"):
                         st.rerun()
 
             if st.form_submit_button(
-                f"👤 Добавить абонента",
+                "👤 Добавить абонента",
                     key=f"as_btn_{s_idx}"):
                 sec["subscribers"].append(
                     {"name": "", "number": "", "buses": []})

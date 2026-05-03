@@ -1,6 +1,6 @@
 from schemas import SubscriberUpdate
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 from database import get_session
 from models import Subscriber
 from schemas import SubscriberCreate, SubscriberRead
