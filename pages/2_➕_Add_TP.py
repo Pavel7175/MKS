@@ -1,165 +1,126 @@
 import streamlit as st
 import requests
-from datetime import date
+import copy
+import uuid
+from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
 
 API_URL = "http://127.0.0.1:8000"
 
-st.title("➕ Регистрация новой ТП")
+st.set_page_config(page_title="Добавить ТП", layout="wide")
+st.title("➕ Добавление новой ТП")
 
-# Инициализация состояния формы в session_state
-if "form_data" not in st.session_state:
-    st.session_state.form_data = {"sections": []}
+if "new_tp" not in st.session_state:
+    st.session_state.new_tp = {
+        "tp_number": "", "district": "", "region": "", "address": "",
+        "voltage": "10/0.4 кВ", "transformer_type": "", "uspd_type": "",
+        "execution_type": "", "commissioning_date": None,
+        "sections": []
+    }
 
-# --- БЛОК 1: ОСНОВНЫЕ ДАННЫЕ ТП ---
-with st.expander("основные характеристики ТП", expanded=True):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        tp_number = st.text_input("Номер ТП*", placeholder="Например: ТП-500")
-        district = st.text_input("Район")
-        region = st.text_input("Округ")
-    with col2:
-        address = st.text_input("Адрес ТП")
-        voltage = st.selectbox(
-            "Напряжение", [
-                "10/0.4 кВ", "6/0.4 кВ", "20/0.4 кВ", "0.4 кВ"])
-        exec_type = st.text_input(
-            "Тип исполнения",
-            placeholder="БКТП, Киосковая...")
-    with col3:
-        trans_type = st.text_input("Тип трансформатора")
-        uspd_type = st.text_input("Тип УСПД")
-        comm_date = st.date_input("Дата включения", value=date.today())
+if "sub_buffer" not in st.session_state:
+    st.session_state.sub_buffer = None
 
-st.divider()
-
-# --- БЛОК 2: УПРАВЛЕНИЕ СТРУКТУРОЙ (ЛУЧИ И АБОНЕНТЫ) ---
-st.subheader("Структура секций (лучей)")
+tp = st.session_state.new_tp
 
 if st.button("➕ Добавить новый Луч"):
-    st.session_state.form_data["sections"].append({
-        "number": "",
-        "assembly_type": "",
-        "panel": "",
-        "subscribers": []
-    })
+    tp["sections"].append(
+        {"number": f"Луч {len(tp['sections'])+1}", "panel": "",
+         "assembly_type": "", "subscribers": []})
+    st.rerun()
+with st.form("add_tp_form"):
+    st.subheader("🏢 Характеристики подстанции")
+    tp["tp_number"] = st.text_input("📝 Номер ТП", value=tp["tp_number"])
+    tp.update(tp_fields(tp))
 
-# Отрисовка каждой секции
-for s_idx, sec in enumerate(st.session_state.form_data["sections"]):
-    with st.container(border=True):
-        c1, c2, c3, c4 = st.columns([2, 2, 2, 1])
-        sec["number"] = c1.text_input(
-            "Название луча",
-            key=f"s_n_{s_idx}",
-            placeholder="Луч А")
-        sec["assembly_type"] = c2.text_input("Тип сборки", key=f"s_at_{s_idx}")
-        sec["panel"] = c3.text_input("Панель", key=f"s_p_{s_idx}")
+    for s_idx, sec in enumerate(tp["sections"]):
+        st.divider()
+        with st.expander(f"📍 {sec['number']}", expanded=True):
+            sec.update(section_fields(sec, key_prefix=f"add_s_{s_idx}"))
 
-        if c4.button("🗑️", key=f"del_s_{s_idx}", help="Удалить луч"):
-            st.session_state.form_data["sections"].pop(s_idx)
-            st.rerun()
+            for a_idx, sub in enumerate(sec["subscribers"]):
+                with st.container(border=True):
+                    # ПАНЕЛЬ УПРАВЛЕНИЯ АБОНЕНТОМ
+                    c_h, c_cp, c_ps, c_dl = st.columns([0.5, 0.15, 0.15, 0.1])
+                    c_h.write(f"👤 **Абонент №{a_idx + 1}**")
 
-        # Добавление абонента в луч
-        if st.button(
-            f"👤 Добавить абонента в {sec['number'] if sec['number'] else 'этот луч'}",
-                key=f"add_sub_{s_idx}"):
-            sec["subscribers"].append({
-                "number": "", "name": "", "address": "", "fuse_rating": "",
-                "cable_brand": "", "cable_length": 0.0, "ct_rating": "",
-                "ct_type": "", "meter_type": "", "buses": []
-            })
+                    # 📋 КОПИРОВАТЬ
+                    if c_cp.form_submit_button("📋", key=f"cp_{s_idx}_{a_idx}"):
+                        st.session_state.sub_buffer = copy.deepcopy(sub)
+                        st.toast("Данные абонента скопированы")
 
-        # Список абонентов внутри луча
-        for a_idx, sub in enumerate(sec["subscribers"]):
-            with st.expander(f"Абонент: {sub['name'] if sub['name'] else 'Новый'}"):
-                row1_col1, row1_col2, row1_col3 = st.columns(3)
-                sub["number"] = row1_col1.text_input(
-                    "№ Абонента", key=f"a_num_{s_idx}_{a_idx}")
-                sub["name"] = row1_col2.text_input(
-                    "Наименование", key=f"a_nam_{s_idx}_{a_idx}")
-                sub["address"] = row1_col3.text_input(
-                    "Адрес", key=f"a_adr_{s_idx}_{a_idx}")
+                    # 📥 ВСТАВИТЬ (С ПОЛНОЙ ОЧИСТКОЙ)
+                    if c_ps.form_submit_button("📥", key=f"ps_{s_idx}_{a_idx}"):
+                        if st.session_state.sub_buffer:
+                            # 1. Глубокое копирование данных из буфера
+                            source = copy.deepcopy(st.session_state.sub_buffer)
 
-                row2_col1, row2_col2, row2_col3 = st.columns(3)
-                sub["fuse_rating"] = row2_col1.text_input(
-                    "Предохранитель", key=f"a_fs_{s_idx}_{a_idx}")
-                sub["cable_brand"] = row2_col2.text_input(
-                    "Марка кабеля", key=f"a_cb_{s_idx}_{a_idx}")
-                sub["cable_length"] = row2_col3.number_input(
-                    "Длина кабеля (м)", key=f"a_cl_{s_idx}_{a_idx}", min_value=0.0)
+                            # 2. Сохраняем то, что не должно меняться
+                            old_name = sub.get("name", "")
+                            old_num = sub.get("number", "")
 
-                row3_col1, row3_col2, row3_col3 = st.columns(3)
-                sub["ct_rating"] = row3_col1.text_input(
-                    "Номинал ТТ", key=f"a_ctr_{s_idx}_{a_idx}")
-                sub["ct_type"] = row3_col2.text_input(
-                    "Тип ТТ", key=f"a_ctt_{s_idx}_{a_idx}")
-                sub["meter_type"] = row3_col3.text_input(
-                    "Тип ПУ", key=f"a_mt_{s_idx}_{a_idx}")
+                            # 3. Полная замена объекта в списке
+                            sec["subscribers"][a_idx] = source
+                            sec["subscribers"][a_idx]["name"] = old_name
+                            sec["subscribers"][a_idx]["number"] = old_num
 
-                # --- ВНУТРЕННИЙ БЛОК ШИН ---
-                st.markdown("#### 🔗 Шины абонента")
+                            # 4. ЖЕСТКАЯ ОЧИСТКА ВСЕХ КЛЮЧЕЙ ЭТОГО АБОНЕНТА И ЕГО ШИН
+                            # Мы удаляем всё, что связано с этим индексом
+                            # абонента
+                            target_prefix = f"_{s_idx}_{a_idx}"
+                            keys_to_flush = [
+                                str(k) for k in st.session_state.keys()
+                                if target_prefix in str(k)
+                            ]
+                            for k in keys_to_flush:
+                                if k in st.session_state:
+                                    del st.session_state[k]
 
-                # Кнопка добавления новой шины именно этому абоненту
-                if st.button(
-                    f"➕ Добавить шину",
-                        key=f"add_bus_{s_idx}_{a_idx}"):
-                    sub["buses"].append({"bus_type": "", "bus_count": 1})
-                    st.rerun()
+                            st.rerun()
+                        else:
+                            st.warning("Буфер пуст")
 
-                # Список шин
-                for b_idx, bus in enumerate(sub["buses"]):
-                    bc1, bc2, bc3 = st.columns([3, 2, 1])
-                    bus["bus_type"] = bc1.text_input(
-                        "Тип шины",
-                        key=f"b_t_{s_idx}_{a_idx}_{b_idx}",
-                        placeholder="Медная 40х4"
-                    )
-                    bus["bus_count"] = bc2.number_input(
-                        "Кол-во",
-                        key=f"b_c_{s_idx}_{a_idx}_{b_idx}",
-                        min_value=1,
-                        step=1
-                    )
-                    if bc3.button("❌", key=f"del_b_{s_idx}_{a_idx}_{b_idx}"):
-                        sub["buses"].pop(b_idx)
+                    if c_dl.form_submit_button(
+                            "🗑️", key=f"dl_{s_idx}_{a_idx}"):
+                        sec["subscribers"].pop(a_idx)
                         st.rerun()
 
-                if st.button(
-                    "🗑️ Удалить абонента",
-                        key=f"del_a_{s_idx}_{a_idx}"):
-                    sec["subscribers"].pop(a_idx)
-                    st.rerun()
+                    # Отрисовка полей
+                    sub.update(
+                        subscriber_fields(
+                            sub, key_prefix=f"asub_{s_idx}_{a_idx}"))
 
-st.divider()
+                    st.write("🔗 **Шины**")
+                    for b_idx, bus in enumerate(sub.get("buses", [])):
+                        bus_fields(
+                            bus, key_prefix=f"ab_{s_idx}_{a_idx}_{b_idx}")
 
-# --- КНОПКА СОХРАНЕНИЯ ---
-if st.button(
-    "💾 СОХРАНИТЬ ВСЮ ТП В БАЗУ",
-    type="primary",
-        use_container_width=True):
-    if not tp_number:
-        st.error("Ошибка: Поле 'Номер ТП' должно быть заполнено!")
-    else:
-        full_payload = {
-            "tp_number": tp_number,
-            "district": district,
-            "region": region,
-            "address": address,
-            "voltage": voltage,
-            "execution_type": exec_type,
-            "transformer_type": trans_type,
-            "uspd_type": uspd_type,
-            "commissioning_date": str(comm_date),
-            "sections": st.session_state.form_data["sections"]
-        }
+                    if st.form_submit_button(
+                            f"➕ Добавить шину", key=f"abn_{s_idx}_{a_idx}"):
+                        sub.setdefault(
+                            "buses", []).append(
+                            {"bus_type": "", "bus_count": 1})
+                        st.rerun()
 
-        try:
-            response = requests.post(f"{API_URL}/tps/", json=full_payload)
-            if response.status_code == 200:
-                st.success(
-                    f"✅ ТП {tp_number} со всей структурой успешно сохранена!")
-                st.session_state.form_data = {"sections": []}  # Очистка формы
-                st.balloons()
-            else:
-                st.error(f"Ошибка API: {response.text}")
-        except Exception as e:
-            st.error(f"Не удалось связаться с сервером: {e}")
+            if st.form_submit_button(
+                f"👤 Добавить абонента",
+                use_container_width=True,
+                    key=f"as_btn_{s_idx}"):
+                sec["subscribers"].append(
+                    {"name": "", "number": "", "address": "", "ct_type": "",
+                     "ct_rating": "", "meter_type": "", "fuse_rating": "",
+                     "cable_brand": "", "cable_length": 0.0, "buses": []})
+                st.rerun()
+
+    if st.form_submit_button("💾 СОХРАНИТЬ ТП", use_container_width=True):
+        if not tp["tp_number"]:
+            st.error("Введите номер ТП!")
+        else:
+            payload = copy.deepcopy(tp)
+            if payload.get("commissioning_date"):
+                payload["commissioning_date"] = str(
+                    payload["commissioning_date"])
+            res = requests.post(f"{API_URL}/tps/", json=payload)
+            if res.status_code == 200:
+                st.success("Успешно сохранено!")
+                st.session_state.new_tp = {"tp_number": "", "sections": []}
+                st.rerun()
