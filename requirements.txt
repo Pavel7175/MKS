@@ -7,4 +7,6 @@ pandas
 openpyxl
 streamlit
 requests
-watchdog
+passlib
+bcrypt
+rgon2-cffi

@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 from io import BytesIO
-
+import streamlit as st
+if not st.session_state.get("logged_in"):
+    st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
 
 st.title("📊 Экспорт данных")

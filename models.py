@@ -73,6 +73,7 @@ class TP(SQLModel, table=True):
     commissioning_date: Optional[date] = None
     transformer_type: str
     uspd_type: str  # Тип УСПД
+    docs_url: str | None = Field(default=None)
 
     # sections: List["Section"] = Relationship(
     #     back_populates="tp",
@@ -90,3 +91,18 @@ class Reference(SQLModel, table=True):
     category: str = Field(index=True)  # 'TT', 'PU', 'Bus', 'Panel', 'USPD'
     # Название, например '200/5' или 'Меркурий 230'
     value: str = Field(unique=True)
+
+
+class Task(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    tp_number: str = Field(index=True, unique=True)  # Номер ТП
+    district: str                                   # Район
+    executor: str                                   # Исполнитель
+    deadline: str                                   # Дата готовности
+
+
+class User(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    password_hash: str
+    role: str = "user"  # "admin" или "user"

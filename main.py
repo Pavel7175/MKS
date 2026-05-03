@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from database import create_db_and_tables
-from routers import tp, sections, subscribers, buses, refs
-
+from routers import tp, sections, subscribers, buses, refs, task
+from routers import users
 app = FastAPI(title="MKS API")
 
 
@@ -16,6 +16,8 @@ app.include_router(sections.router)
 app.include_router(subscribers.router)
 app.include_router(buses.router)
 app.include_router(refs.router)
+app.include_router(task.router)
+app.include_router(users.router)
 
 
 @app.get("/")

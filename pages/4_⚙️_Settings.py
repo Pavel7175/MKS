@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
-
+import streamlit as st
+if not st.session_state.get("logged_in"):
+    st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
 
 st.title("⚙️ Управление справочниками")

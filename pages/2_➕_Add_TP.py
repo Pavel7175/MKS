@@ -3,11 +3,14 @@ import requests
 import copy
 import uuid
 from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
-
+import streamlit as st
+if not st.session_state.get("logged_in"):
+    st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
 
 st.set_page_config(page_title="Добавить ТП", layout="wide")
 st.title("➕ Добавление новой ТП")
+
 
 # 1. Инициализация состояния
 if "new_tp" not in st.session_state:
@@ -17,6 +20,10 @@ if "sub_buffer" not in st.session_state:
 if "sub_salts" not in st.session_state:
     st.session_state.sub_salts = {}
 
+if "prefill_tp" in st.session_state:
+    p = st.session_state.prefill_tp
+    st.session_state.new_tp["tp_number"] = p["tp_number"]
+    st.session_state.new_tp["district"] = p["district"]
 tp = st.session_state.new_tp
 tp_number = st.text_input(
     "📝 Номер ТП",
@@ -147,9 +154,14 @@ with st.form("add_tp_form"):
                 res = requests.post(f"{API_URL}/tps/", json=payload)
 
                 if res.status_code == 200:
+                    if "prefill_tp" in st.session_state:
+                        task_id = st.session_state.prefill_tp["id"]
+                        requests.delete(f"{API_URL}/tasks/{task_id}")
+                        del st.session_state.prefill_tp
                     st.success(f"✅ ТП {tp['tp_number']} успешно сохранена!")
                     st.session_state.new_tp = {"tp_number": "", "sections": []}
                     st.switch_page("pages/1_📋_View_TP.py")
+
                 elif res.status_code == 400:
                     # Выводим именно то сообщение, которое прислал Бэкенд
                     error_msg = res.json().get("detail", "Ошибка валидации")

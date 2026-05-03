@@ -3,7 +3,9 @@ import requests
 import pandas as pd
 from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
 import uuid
-
+import streamlit as st
+if not st.session_state.get("logged_in"):
+    st.switch_page("app.py")
 
 API_URL = "http://127.0.0.1:8000"
 
@@ -43,7 +45,19 @@ if "edit_mode" not in st.session_state:
 if "edit_data" not in st.session_state:
     st.session_state.edit_data = {}
 
-search_query = st.text_input("🔍 Быстрый поиск по номеру ТП")
+# search_query = st.text_input("🔍 Быстрый поиск по номеру ТП")
+search_query = st.text_input("🔍 Поиск ТП",
+                             placeholder="Введите номер ТП или адрес...")
+
+# 2. Фильтрация списка (если что-то введено)
+tps_list = tps
+if search_query:
+    tps_list = [
+        tp for tp in tps_list
+        if search_query.lower() in tp['tp_number'].lower()
+        or search_query.lower() in tp['address'].lower()
+    ]
+    st.write(f"Найдено объектов: {len(tps_list)}")
 
 if search_query:
     url = f"{API_URL}/tps/by-number/{search_query}"
@@ -64,7 +78,46 @@ try:
 except BaseException:
     tps = []
 # --- Основной цикл отрисовки ---
-for tp in tps:
+# ОПРЕДЕЛЯЕМ ДИАЛОГ ОДИН РАЗ ВНЕ ЦИКЛА
+
+
+@st.dialog("Удаление объекта")
+def delete_confirm_dialog(tp_to_delete):
+    st.error(
+        f"Вы уверены, что хотите полностью удалить ТП №{tp_to_delete['tp_number']}?")
+    st.write(f"Адрес: {tp_to_delete['address']}")
+
+    dcol1, dcol2 = st.columns(2)
+    if dcol1.button("Отмена", use_container_width=True):
+        st.rerun()
+
+    if dcol2.button("🔥 Да, удалить", type="primary", use_container_width=True):
+        res = requests.delete(f"{API_URL}/tps/{tp_to_delete['id']}")
+        if res.status_code == 200:
+            st.success("Удалено успешно!")
+            # Очищаем состояние редактирования на всякий случай
+            st.session_state.edit_mode = None
+            st.rerun()  # Теперь просто перегружаем страницу со списком
+        else:
+            st.error(
+                f"Ошибка сервера: {res.json().get('detail', 'Неизвестная ошибка')}")
+
+
+# 1. Поле поиска в самом верху
+# search_query = st.text_input("🔍 Поиск ТП",
+#                              placeholder="Введите номер ТП или адрес...")
+
+# # 2. Фильтрация списка (если что-то введено)
+# tps_list = tps
+# if search_query:
+#     tps_list = [
+#         tp for tp in tps_list
+#         if search_query.lower() in tp['tp_number'].lower()
+#         or search_query.lower() in tp['address'].lower()
+#     ]
+#     st.write(f"Найдено объектов: {len(tps_list)}")
+
+for tp in tps_list:
     tp_id = tp['id']
     is_editing = st.session_state.edit_mode == tp_id
 
@@ -81,6 +134,36 @@ for tp in tps:
                 st.session_state.edit_mode = tp_id
                 st.session_state.edit_data = tp.copy()
                 st.rerun()
+            # --- АВТОМАТИЧЕСКАЯ ССЫЛКА (Район / Номер ТП) ---
+
+            # 1. Базовый путь к папке "Рабочее проектирование"
+            base_url = "https://disk.yandex.ru/client/disk/СТОК РД/МКС АСКУЭ ТП 2021/Рабочее проектирование/"
+
+            # 2. Берем Район и Номер ТП из данных (ed)
+            dist = tp.get('district', '')
+            tp_num = tp.get('tp_number', '')
+
+            # 3. Отрисовка кнопок управления
+            c_space, c_docs, c_del = st.columns([0.6, 0.2, 0.2])
+
+            if dist and tp_num:
+                # Собираем путь: база / Район / Номер ТП
+                # Например: .../Рабочее проектирование/17/16172
+                full_url = f"{base_url}{dist}/{tp_num}"
+
+                c_docs.link_button(
+                    "📂 Документы",
+                    full_url,
+                    use_container_width=True,
+                    help=f"Открыть папку ТП {tp_num} в районе {dist}"
+                )
+            else:
+                # Если чего-то не хватает, пишем подсказку
+                reason = "Нет района" if not dist else "Нет номера"
+                c_docs.button(
+                    f"📂 {reason}",
+                    disabled=True,
+                    use_container_width=True)
 
             for sec in tp['sections']:
                 with st.expander(f"📍 Луч: {sec['number']} (Панель: {sec['panel']})"):
@@ -104,42 +187,14 @@ for tp in tps:
 
             # --- Кнопка УДАЛЕНИЯ всей ТП (над формой редактирования) ---
             # Кнопка удаления
-            col_empty, col_del = st.columns([0.8, 0.2])
 
-            if col_del.button(
+            # 2. Твоя кнопка удаления
+            if c_del.button(
                 "🗑️ Удалить ТП",
-                key=f"del_tp_{tp['id']}",
+                key=f"del_tp_{tp_id}",
                 type="secondary",
                     use_container_width=True):
-                @st.dialog("Удаление объекта")
-                def delete_process():
-                    st.error(
-                        f"Вы уверены, что хотите полностью удалить {tp['tp_number']}?")
-
-                    # Используем две колонки для кнопок внутри диалога
-                    dcol1, dcol2 = st.columns(2)
-
-                    if dcol1.button("Отмена", use_container_width=True):
-                        st.rerun()  # Просто закрывает диалог
-
-                    if dcol2.button(
-                        "🔥 Да, удалить",
-                        type="primary",
-                            use_container_width=True):
-                        res = requests.delete(f"{API_URL}/tps/{tp['id']}")
-                        if res.status_code == 200:
-                            # ВАЖНО: Сначала очищаем ID из памяти, чтобы
-                            # страница не пыталась его найти
-                            if 'edit_tp_id' in st.session_state:
-                                del st.session_state.edit_tp_id
-
-                            st.success("Удалено успешно!")
-                            # Мгновенный переход в общий список
-                            st.switch_page("pages/1_📋_View_TP.py")
-                        else:
-                            st.error("Ошибка сервера при удалении")
-
-                delete_process()
+                delete_confirm_dialog(tp)
 
             # --- РЕДАКТИРОВАНИЕ ---
             st.warning(f"🛠 Редактирование {tp['tp_number']}")
