@@ -1,3 +1,5 @@
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel, create_engine, Session
 # Импортируем модели, чтобы SQLModel зарегистрировал их в метаданных
 from models import TP, Section, Subscriber, Bus, Reference  # noqa
@@ -16,3 +18,10 @@ def create_db_and_tables():
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()

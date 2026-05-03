@@ -33,7 +33,13 @@ class Subscriber(SQLModel, table=True):
     # Связи
     section_id: int = Field(foreign_key="section.id")
     section: "Section" = Relationship(back_populates="subscribers")
-    buses: List[Bus] = Relationship(back_populates="subscriber")
+    # buses: List[Bus] = Relationship(back_populates="subscriber")
+
+    buses: list["Bus"] = Relationship(
+        back_populates="subscriber",
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan"}  # УДАЛЯТЬ ВСЕХ ДЕТЕЙ
+    )
 
 # 3. Секция (Луч)
 
@@ -46,7 +52,12 @@ class Section(SQLModel, table=True):
 
     tp_id: int = Field(foreign_key="tp.id")
     tp: "TP" = Relationship(back_populates="sections")
-    subscribers: List[Subscriber] = Relationship(back_populates="section")
+    # subscribers: List[Subscriber] = Relationship(back_populates="section")
+    subscribers: list["Subscriber"] = Relationship(
+        back_populates="section",
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan"}  # УДАЛЯТЬ ВСЕХ ДЕТЕЙ
+    )
 
 # 4. ТП (Трансформаторная подстанция)
 
@@ -63,9 +74,14 @@ class TP(SQLModel, table=True):
     transformer_type: str
     uspd_type: str  # Тип УСПД
 
-    sections: List["Section"] = Relationship(
+    # sections: List["Section"] = Relationship(
+    #     back_populates="tp",
+    #     cascade_delete=True
+    # )
+    sections: list["Section"] = Relationship(
         back_populates="tp",
-        cascade_delete=True
+        sa_relationship_kwargs={
+            "cascade": "all, delete-orphan"}  # УДАЛЯТЬ ВСЕХ ДЕТЕЙ
     )
 
 

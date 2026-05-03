@@ -1,3 +1,4 @@
+import logging
 from datetime import date  # Добавь в начало файла
 from datetime import date  # Не забудь импорт в начале файла
 from schemas import TPUpdate
@@ -16,39 +17,61 @@ from schemas import TPUpdate, TPRead, TPRead, TPUpdate
 from datetime import date
 from utils import sync_references
 from fastapi import Query
-from sqlmodel import select, col
+from sqlmodel import select, col, desc
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import select
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
 @router.post("/", response_model=TPRead)
 def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
-    # 1. Создаем объект ТП
-    sync_references(tp_data.dict(), session)
-    db_tp = TP(**tp_data.dict(exclude={"sections"}))
+    # 1. ПРОВЕРКА НА ДУБЛИКАТ (перед созданием)
+    existing_tp = session.exec(select(TP).where(
+        TP.tp_number == tp_data.tp_number)).first()
+    if existing_tp:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ТП с номером {tp_data.tp_number} уже существует в базе!"
+        )
 
-    # 2. Обходим секции
-    for sec_data in tp_data.sections:
-        db_section = Section(
-            **sec_data.dict(exclude={"subscribers"}),
-            tp=db_tp)
-        session.add(db_section)
+    try:
+        # Твой текущий код создания объектов (как на скрине)
+        # 1. Создаем объект ТП
+        sync_references(tp_data.dict(), session)
+        db_tp = TP(**tp_data.dict(exclude={"sections"}))
 
-        # 3. Обходим абонентов
-        for sub_data in sec_data.subscribers:
-            db_subscriber = Subscriber(
-                **sub_data.dict(exclude={"buses"}),
-                section=db_section)
-            session.add(db_subscriber)
+        # 2. Обходим секции
+        for sec_data in tp_data.sections:
+            db_section = Section(
+                **sec_data.dict(exclude={"subscribers"}),
+                tp=db_tp
+            )
+            session.add(db_section)
 
-            # 4. Обходим шины
-            for bus_data in sub_data.buses:
-                db_bus = Bus(**bus_data.dict(), subscriber=db_subscriber)
-                session.add(db_bus)
+            # 3. Обходим абонентов
+            for sub_data in sec_data.subscribers:
+                db_subscriber = Subscriber(
+                    **sub_data.dict(exclude={"buses"}),
+                    section=db_section
+                )
+                session.add(db_subscriber)
 
-    session.add(db_tp)
-    session.commit()
-    session.refresh(db_tp)
-    return db_tp
+                # 4. Обходим шины
+                for bus_data in sub_data.buses:
+                    db_bus = Bus(**bus_data.dict(), subscriber=db_subscriber)
+                    session.add(db_bus)
+
+        session.add(db_tp)
+        session.commit()
+        session.refresh(db_tp)
+        return db_tp
+
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Ошибка целостности данных (возможно, дубликат)")
 
 
 @router.get("/", response_model=list[TPRead])
@@ -58,10 +81,7 @@ def read_tps(
     limit: int = 20
 ):
     # Добавляем принудительную сортировку по ID
-    statement = select(TP).order_by(TP.id).offset(offset).limit(limit)
-
-    # Печатаем в консоль uvicorn для отладки
-    print(f"DEBUG: Запрос с offset={offset}, limit={limit}")
+    statement = select(TP).order_by(desc(TP.id)).offset(offset).limit(limit)
 
     tps = session.exec(statement).all()
     return tps
@@ -69,15 +89,26 @@ def read_tps(
 
 @router.delete("/{tp_id}")
 def delete_tp(tp_id: int, session: Session = Depends(get_session)):
-    tp = session.get(TP, tp_id)
-    if not tp:
-        raise HTTPException(status_code=404, detail="ТП не найдена")
+    try:
+        tp = session.get(TP, tp_id)
+        if not tp:
+            raise HTTPException(status_code=404, detail="ТП не найдена")
 
-    # SQLModel сам удалит вложенные данные, если настроен cascade (по
-    # умолчанию в SQLite это нужно проверять)
-    session.delete(tp)
-    session.commit()
-    return {"message": f"ТП {tp.tp_number} и все связанные данные удалены"}
+        # Явное удаление (чтобы обойти проблемы с SQLite)
+        session.delete(tp)
+        session.commit()
+        return {"message": "Удалено успешно"}
+
+    except IntegrityError as e:
+        session.rollback()
+        logging.error(f"ОШИБКА СВЯЗЕЙ БД: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Нельзя удалить: есть связанные данные. Ошибка: {str(e)}")
+    except Exception as e:
+        session.rollback()
+        logging.error(f"ОБЩАЯ ОШИБКА: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/by-number/{tp_number}", response_model=TPRead)
@@ -160,3 +191,10 @@ def update_tp(
     session.commit()
     session.refresh(db_tp)
     return db_tp
+
+
+@router.get("/check-number/{tp_number}")
+def check_tp_number(tp_number: str, session: Session = Depends(get_session)):
+    statement = select(TP).where(TP.tp_number == tp_number)
+    exists = session.exec(statement).first() is not None
+    return {"exists": exists}

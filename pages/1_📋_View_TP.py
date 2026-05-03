@@ -101,6 +101,46 @@ for tp in tps:
                                     st.caption(f"**Шины:** {bus_str}")
 
         else:
+
+            # --- Кнопка УДАЛЕНИЯ всей ТП (над формой редактирования) ---
+            # Кнопка удаления
+            col_empty, col_del = st.columns([0.8, 0.2])
+
+            if col_del.button(
+                "🗑️ Удалить ТП",
+                key=f"del_tp_{tp['id']}",
+                type="secondary",
+                    use_container_width=True):
+                @st.dialog("Удаление объекта")
+                def delete_process():
+                    st.error(
+                        f"Вы уверены, что хотите полностью удалить {tp['tp_number']}?")
+
+                    # Используем две колонки для кнопок внутри диалога
+                    dcol1, dcol2 = st.columns(2)
+
+                    if dcol1.button("Отмена", use_container_width=True):
+                        st.rerun()  # Просто закрывает диалог
+
+                    if dcol2.button(
+                        "🔥 Да, удалить",
+                        type="primary",
+                            use_container_width=True):
+                        res = requests.delete(f"{API_URL}/tps/{tp['id']}")
+                        if res.status_code == 200:
+                            # ВАЖНО: Сначала очищаем ID из памяти, чтобы
+                            # страница не пыталась его найти
+                            if 'edit_tp_id' in st.session_state:
+                                del st.session_state.edit_tp_id
+
+                            st.success("Удалено успешно!")
+                            # Мгновенный переход в общий список
+                            st.switch_page("pages/1_📋_View_TP.py")
+                        else:
+                            st.error("Ошибка сервера при удалении")
+
+                delete_process()
+
             # --- РЕДАКТИРОВАНИЕ ---
             st.warning(f"🛠 Редактирование {tp['tp_number']}")
             ed = st.session_state.edit_data
