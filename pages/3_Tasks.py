@@ -1,5 +1,6 @@
-import streamlit as st
 import requests
+import streamlit as st
+
 if not st.session_state.get("logged_in"):
     st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
@@ -56,7 +57,7 @@ if res.status_code == 200:
                             key=f"go_{task.get('id', idx)}",
                                 use_container_width=True):
                             st.session_state.prefill_tp = task
-                            st.switch_page("pages/2_➕_Add_TP.py")
+                            st.switch_page("pages/2_Add_TP.py")
                             st.rerun()
     else:
         st.error(f"Ошибка данных: Ожидался список, получено: {type(tasks)}")

@@ -10,6 +10,6 @@ requests
 passlib
 bcrypt
 rgon2-cffi
-
+st-pages
 
 aspose-diagram

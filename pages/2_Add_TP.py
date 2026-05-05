@@ -1,8 +1,11 @@
-import streamlit as st
-import requests
 import copy
 import uuid
-from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
+
+import requests
+import streamlit as st
+
+from ui_components import bus_fields, section_fields, subscriber_fields, tp_fields
+
 if not st.session_state.get("logged_in"):
     st.switch_page("app.py")
 API_URL = "http://127.0.0.1:8000"
@@ -24,23 +27,7 @@ if "prefill_tp" in st.session_state:
     st.session_state.new_tp["tp_number"] = p["tp_number"]
     st.session_state.new_tp["district"] = p["district"]
 tp = st.session_state.new_tp
-tp_number = st.text_input(
-    "📝 Номер ТП",
-    value=tp.get(
-        "tp_number",
-        ""),
-    placeholder="Напр: ТП-500")
-if tp_number:
-    try:
-        check_res = requests.get(f"{API_URL}/tps/check-number/{tp_number}")
-        if check_res.status_code == 200 and check_res.json().get("exists"):
-            st.error(
-                f"⚠️ Внимание! ТП №{tp_number} уже зарегистрирована в системе.")
-            st.stop()  # Здесь выполнение прервется, форма ниже не появится
-        else:
-            tp["tp_number"] = tp_number
-    except BaseException:
-        pass
+
 
 if st.button("➕ Добавить новый Луч"):
     tp["sections"].append(
@@ -49,6 +36,23 @@ if st.button("➕ Добавить новый Луч"):
 
 with st.form("add_tp_form"):
     tp["tp_number"] = st.text_input("📝 Номер ТП", value=tp["tp_number"])
+    tp_number=tp["tp_number"] 
+    if tp_number:
+        try:
+            check_res = requests.get(f"{API_URL}/tps/check-number/{tp_number}")
+            if check_res.status_code == 200 and check_res.json().get("exists"):
+                st.error(
+                    f"⚠️ Внимание! ТП №{tp_number} уже зарегистрирована в системе.")
+                st.stop()  # Здесь выполнение прервется, форма ниже не появится
+            else:
+                tp["tp_number"] = tp_number
+        except BaseException:
+            pass
+
+
+
+
+
     tp.update(tp_fields(tp))
 
     for s_idx, sec in enumerate(tp["sections"]):
@@ -159,7 +163,7 @@ with st.form("add_tp_form"):
                         del st.session_state.prefill_tp
                     st.success(f"✅ ТП {tp['tp_number']} успешно сохранена!")
                     st.session_state.new_tp = {"tp_number": "", "sections": []}
-                    st.switch_page("pages/1_📋_View_TP.py")
+                    st.switch_page("pages/1_View_TP.py")
 
                 elif res.status_code == 400:
                     # Выводим именно то сообщение, которое прислал Бэкенд
