@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
 from database import get_session
+from fastapi import APIRouter, Depends, HTTPException
 from models import Section
 from schemas import SectionCreate, SectionRead
+from sqlmodel import Session
 
 router = APIRouter(prefix="/sections", tags=["Секции (Лучи)"])
 

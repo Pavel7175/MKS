@@ -1,7 +1,14 @@
-import streamlit as st
-import requests
-from ui_components import tp_fields, subscriber_fields, bus_fields, section_fields
 import uuid
+
+import requests
+import streamlit as st
+from ui_components import (
+    bus_fields,
+    section_fields,
+    subscriber_fields,
+    tp_fields,
+)
+
 if not st.session_state.get("logged_in"):
     st.switch_page("app.py")
 

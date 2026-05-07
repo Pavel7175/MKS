@@ -1,9 +1,8 @@
-from schemas import SubscriberUpdate
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
 from database import get_session
+from fastapi import APIRouter, Depends, HTTPException
 from models import Subscriber
-from schemas import SubscriberCreate, SubscriberRead
+from schemas import SubscriberCreate, SubscriberRead, SubscriberUpdate
+from sqlmodel import Session
 
 router = APIRouter(prefix="/subscribers", tags=["Абоненты"])
 

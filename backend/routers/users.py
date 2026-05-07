@@ -3,12 +3,11 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from argon2 import PasswordHasher
+from database import get_session
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlmodel import Session, select
-
-from database import get_session
 from models import User
+from sqlmodel import Session, select
 
 # --- Конфигурация ---
 SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")

@@ -20,10 +20,10 @@ def login_page():
             try:
                 res = requests.post(
                     f"{API_URL}/auth/login",
-                    params={"username": user, "password": pw}
+                    data={"username": user, "password": pw}
                 )
                 data = res.json()
-                if data.get("auth"):
+                if 'access_token' in data:
                     st.session_state.logged_in = True
                     st.session_state.username = data["username"]
                     st.session_state.role = data.get("role") 

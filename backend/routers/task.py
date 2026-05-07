@@ -1,9 +1,8 @@
+from database import get_session
 from fastapi import APIRouter, Depends, HTTPException
+from models import Task, TaskUpdate
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
-
-from database import get_session
-from models import Task, TaskUpdate
 
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
 

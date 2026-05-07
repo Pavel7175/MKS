@@ -1,13 +1,12 @@
 import logging
 from datetime import date  # Добавь в начало файла
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, desc, select
-
 from database import get_session
+from fastapi import APIRouter, Depends, HTTPException
 from models import TP, Bus, Section, Subscriber
 from schemas import TPCreate, TPRead
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, desc, select
 from utils import sync_references
 
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])

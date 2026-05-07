@@ -1,5 +1,5 @@
-from sqlmodel import Session, select
 from models import Reference
+from sqlmodel import Session, select
 
 
 def sync_references(data: dict, session: Session):

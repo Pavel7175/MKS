@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from database import get_session
-from models import Reference
 from typing import List
+
+from database import get_session
+from fastapi import APIRouter, Depends, HTTPException
+from models import Reference
+from sqlmodel import Session, select
 
 router = APIRouter(prefix="/refs", tags=["Справочники"])
 

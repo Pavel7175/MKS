@@ -1,9 +1,17 @@
-from fastapi import FastAPI
-
 from database import create_db_and_tables, init_admin
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers import buses, refs, sections, subscribers, task, tp, users, visio
 
 app = FastAPI(title="MKS API")
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # В продакшене замените на конкретный URL фронтенда
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")

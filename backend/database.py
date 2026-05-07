@@ -2,9 +2,6 @@ import os
 
 from argon2 import PasswordHasher
 from dotenv import load_dotenv
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-from sqlmodel import Session, SQLModel, create_engine, select
 
 # Импортируем модели, чтобы SQLModel зарегистрировал их в метаданных
 from models import (  # noqa
@@ -15,6 +12,9 @@ from models import (  # noqa
     Subscriber,
     User,  # Убедись, что путь к модели User верный
 )
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 load_dotenv()
 # Создаем объект ph, у которого есть метод .hash()
@@ -47,7 +47,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 def init_admin():
     # Данные берутся из переменных окружения (которые Streamlit прокидывает из secrets)
     admin_login = os.getenv("ADMIN_LOGIN", "admin")
-    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_password = os.getenv("ADMIN_PASSWORD", "admin")
 
     with Session(engine) as session:
         # Проверяем наличие любого пользователя с ролью admin

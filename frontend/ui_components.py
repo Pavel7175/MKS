@@ -1,6 +1,7 @@
-from logic import get_match_tt
-import streamlit as st
 import requests
+import streamlit as st
+from logic import get_match_tt
+
 API_URL = "http://127.0.0.1:8000"
 
 
