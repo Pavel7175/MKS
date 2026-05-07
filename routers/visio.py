@@ -1,7 +1,8 @@
-import subprocess
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException
+import subprocess
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 router = APIRouter(prefix="/visio", tags=["visio"])

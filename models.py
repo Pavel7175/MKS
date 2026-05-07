@@ -1,5 +1,6 @@
-from typing import Optional
 from datetime import date
+from typing import Optional
+
 from sqlmodel import Field, Relationship, SQLModel
 
 # 1. Шины (т.к. у одного абонента их может быть несколько разных типов)
@@ -74,6 +75,7 @@ class TP(SQLModel, table=True):
     transformer_type: str
     uspd_type: str  # Тип УСПД
     docs_url: str | None = Field(default=None)
+    maps_nn: Optional[str] = None
 
     # sections: List["Section"] = Relationship(
     #     back_populates="tp",
@@ -98,7 +100,9 @@ class Task(SQLModel, table=True):
     tp_number: str = Field(index=True, unique=True)  # Номер ТП
     district: str                                   # Район
     executor: str                                   # Исполнитель
-    deadline: str                                   # Дата готовности
+    deadline: Optional[str] = None 
+    comment: str
+    ppo_report: str
 
 
 class User(SQLModel, table=True):
@@ -106,3 +110,13 @@ class User(SQLModel, table=True):
     username: str = Field(index=True, unique=True)
     password_hash: str
     role: str = "user"  # "admin" или "user"
+
+
+
+class TaskUpdate(SQLModel):
+    tp_number: Optional[str] = None
+    district: Optional[str] = None
+    executor: Optional[str] = None
+    deadline: Optional[str] = None
+    comment: Optional[str] = None
+    ppo_report: Optional[str] = None

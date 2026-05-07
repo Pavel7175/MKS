@@ -26,6 +26,7 @@ def login_page():
                 if data.get("auth"):
                     st.session_state.logged_in = True
                     st.session_state.username = data["username"]
+                    st.session_state.role = data.get("role") 
                     st.rerun()
                 else:
                     st.error("Неверный логин или пароль")
@@ -36,28 +37,49 @@ def login_page():
 # Страница для неавторизованных
 login_screen = st.Page(login_page, title="Вход", icon="🔒")
 
-# Основное меню (только для авторизованных)
-user_pages = [
+
+
+
+# --- Определение страниц ---
+# Базовые страницы, доступные всем сотрудникам
+common_pages = [
     st.Page("pages/1_View_TP.py", title="Просмотр ТП", icon="💻"),
-    st.Page("pages/2_Add_TP.py", title="Добавить новую ТП", icon="➕"),
     st.Page("pages/3_Tasks.py", title="Заявки", icon="📝"),
+]
+
+# Отдельная страница для админа
+admin_page = [
+    st.Page("pages/2_Add_TP.py", title="Добавить новую ТП", icon="➕"),
     st.Page("pages/4_Settings.py", title="Настройки", icon="⚙️"),
     st.Page("pages/5_Visio_Viewer.py", title="Просмотр карты НН", icon="🗺️"),
     st.Page("pages/6_Export.py", title="Экспорт в xlsx", icon="📊"),
+    st.Page("pages/7_Admin.py", title="Администрирование", icon="🔐"),
 ]
 
 # --- Логика навигации ---
 if st.session_state.logged_in:
-    # Если вошли — показываем меню и кнопку выхода в сайдбаре
-    st.sidebar.write(f"👤: **{st.session_state.username}**")
-    if st.sidebar.button("Выйти"):
+    # 1. Формируем список страниц в зависимости от роли
+    pages_to_show = common_pages.copy()
+    
+    if st.session_state.role == "admin":
+        pages_to_show.extend(admin_page)
+    
+    # 2. Оформляем сайдбар
+    st.sidebar.write(f"👤: **{st.session_state.username}** (`{st.session_state.role}`)")
+    if st.sidebar.button("Выйти", use_container_width=True):
         st.session_state.logged_in = False
+        st.session_state.role = None
         st.rerun()
     
-    pg = st.navigation({"Меню": user_pages})
+    # 3. Запускаем навигацию по отфильтрованному списку
+    pg = st.navigation({"Основное меню": pages_to_show})
 else:
     # Если не вошли — доступна только страница логина
     pg = st.navigation([login_screen])
+
+
+
+
 
 # Запускаем выбранную страницу
 pg.run()

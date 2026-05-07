@@ -12,4 +12,7 @@ bcrypt
 rgon2-cffi
 st-pages
 
+python-dotenv
+
 aspose-diagram
+pyjwt

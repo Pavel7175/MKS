@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from database import create_db_and_tables
-from routers import tp, sections, subscribers, buses, refs, task, visio
-from routers import users
+
+from database import create_db_and_tables, init_admin
+from routers import buses, refs, sections, subscribers, task, tp, users, visio
 
 app = FastAPI(title="MKS API")
 
@@ -9,6 +9,7 @@ app = FastAPI(title="MKS API")
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    init_admin()
 
 
 # Регистрируем роутер
@@ -25,3 +26,5 @@ app.include_router(visio.router)
 @app.get("/")
 def read_root():
     return {"message": "Система учета ТП работает"}
+
+

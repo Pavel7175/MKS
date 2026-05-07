@@ -1,14 +1,15 @@
 import logging
 from datetime import date  # Добавь в начало файла
-from fastapi import APIRouter, Depends
-from sqlmodel import Session, select
-from database import get_session
-from models import TP, Section, Subscriber, Bus
-from schemas import TPCreate, TPRead
-from fastapi import HTTPException
-from utils import sync_references
-from sqlmodel import desc
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, desc, select
+
+from database import get_session
+from models import TP, Bus, Section, Subscriber
+from schemas import TPCreate, TPRead
+from utils import sync_references
+
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
 
 
@@ -186,3 +187,27 @@ def check_tp_number(tp_number: str, session: Session = Depends(get_session)):
     statement = select(TP).where(TP.tp_number == tp_number)
     exists = session.exec(statement).first() is not None
     return {"exists": exists}
+
+
+@router.get("/get-link/{tp_number}")
+def get_tp_link(tp_number: str, session: Session = Depends(get_session)):
+    """
+    Возвращает ссылку на Яндекс.Диск (поле maps_nn) по номеру ТП
+    """
+    # 1. Поиск ТП в таблице по номеру
+    # Предполагаем, что в модели TP поле называется tp_number
+    statement = select(TP).where(TP.tp_number == tp_number)
+    tp_record = session.exec(statement).first()
+
+    # 2. Если ТП не найдена — отдаем 404
+    if not tp_record:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"ТП с номером {tp_number} не найдена в базе данных"
+        )
+
+    # 3. Проверяем, заполнено ли поле maps_nn
+    # Если поле пустое, возвращаем None или пустую строку, фронтенд это обработает
+    link = getattr(tp_record, "maps_nn", None)
+    
+    return {"tp_number": tp_number, "maps_nn": link}
