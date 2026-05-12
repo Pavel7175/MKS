@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from database import get_session
 from fastapi import APIRouter, Depends, HTTPException
 from models import Subscriber
@@ -9,13 +11,12 @@ router = APIRouter(prefix="/subscribers", tags=["Абоненты"])
 
 @router.post("/", response_model=SubscriberRead)
 def create_subscriber(
-        sub_data: SubscriberCreate,
-        section_id: int,
-        session: Session = Depends(get_session)):
+    sub_data: SubscriberCreate,
+    section_id: UUID,
+    session: Session = Depends(get_session),
+):
     # Привязываем абонента к секции
-    db_sub = Subscriber(
-        **sub_data.dict(exclude={"buses"}),
-        section_id=section_id)
+    db_sub = Subscriber(**sub_data.dict(exclude={"buses"}), section_id=section_id)
     session.add(db_sub)
     session.commit()
     session.refresh(db_sub)
@@ -23,7 +24,7 @@ def create_subscriber(
 
 
 @router.get("/{sub_id}", response_model=SubscriberRead)
-def read_subscriber(sub_id: int, session: Session = Depends(get_session)):
+def read_subscriber(sub_id: UUID, session: Session = Depends(get_session)):
     sub = session.get(Subscriber, sub_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Абонент не найден")
@@ -32,9 +33,8 @@ def read_subscriber(sub_id: int, session: Session = Depends(get_session)):
 
 @router.patch("/{sub_id}", response_model=SubscriberRead)
 def update_subscriber(
-        sub_id: int,
-        sub_data: SubscriberUpdate,
-        session: Session = Depends(get_session)):
+    sub_id: UUID, sub_data: SubscriberUpdate, session: Session = Depends(get_session)
+):
     db_sub = session.get(Subscriber, sub_id)
     if not db_sub:
         raise HTTPException(status_code=404, detail="Абонент не найден")

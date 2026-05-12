@@ -1,26 +1,38 @@
 import logging
 from datetime import date  # Добавь в начало файла
+from uuid import UUID
 
 from database import get_session
 from fastapi import APIRouter, Depends, HTTPException
 from models import TP, Bus, Section, Subscriber
-from schemas import TPCreate, TPRead
+from schemas import TPCreate, TPRead, TPUpdate
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, desc, select
 from utils import sync_references
 
 router = APIRouter(prefix="/tps", tags=["Трансформаторные подстанции"])
+PAGINATOR_LIMIT = 20
 
 
-@router.post("/", response_model=TPRead)
+@router.post(
+    "/",
+    response_model=TPRead,
+    summary="Создать новую ТП.",
+    description=(
+        "Создает новую ТП в базе данных. "
+        "Перед созданием проверяет по номеру ТП наличие в базе данных."
+    ),
+)
 def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
+    """Создает ТП."""
     # 1. ПРОВЕРКА НА ДУБЛИКАТ (перед созданием)
-    existing_tp = session.exec(select(TP).where(
-        TP.tp_number == tp_data.tp_number)).first()
+    existing_tp = session.exec(
+        select(TP).where(TP.tp_number == tp_data.tp_number)
+    ).first()
     if existing_tp:
         raise HTTPException(
             status_code=400,
-            detail=f"ТП с номером {tp_data.tp_number} уже существует в базе!"
+            detail=f"ТП с номером {tp_data.tp_number} уже существует в базе!",
         )
 
     try:
@@ -31,17 +43,13 @@ def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
 
         # 2. Обходим секции
         for sec_data in tp_data.sections:
-            db_section = Section(
-                **sec_data.dict(exclude={"subscribers"}),
-                tp=db_tp
-            )
+            db_section = Section(**sec_data.dict(exclude={"subscribers"}), tp=db_tp)
             session.add(db_section)
 
             # 3. Обходим абонентов
             for sub_data in sec_data.subscribers:
                 db_subscriber = Subscriber(
-                    **sub_data.dict(exclude={"buses"}),
-                    section=db_section
+                    **sub_data.dict(exclude={"buses"}), section=db_section
                 )
                 session.add(db_subscriber)
 
@@ -58,15 +66,20 @@ def create_tp(tp_data: TPCreate, session: Session = Depends(get_session)):
     except IntegrityError:
         session.rollback()
         raise HTTPException(
-            status_code=400,
-            detail="Ошибка целостности данных (возможно, дубликат)")
+            status_code=400, detail="Ошибка целостности данных (возможно, дубликат)"
+        )
 
 
-@router.get("/", response_model=list[TPRead])
+@router.get(
+    "/",
+    response_model=list[TPRead],
+    summary="Возвращает список всех ТП.",
+    description="Выводит список из PAGINATOR_LIMIT ТП на странице.",
+)
 def read_tps(
     session: Session = Depends(get_session),
     offset: int = 0,
-    limit: int = 20
+    limit: int = PAGINATOR_LIMIT,
 ):
     # Добавляем принудительную сортировку по ID
     statement = select(TP).order_by(desc(TP.id)).offset(offset).limit(limit)
@@ -75,8 +88,12 @@ def read_tps(
     return tps
 
 
-@router.delete("/{tp_id}")
-def delete_tp(tp_id: int, session: Session = Depends(get_session)):
+@router.delete(
+    "/{tp_id}",
+    summary="Удаляет ТП по ее ID.",
+    description="Удаление ТП, лучей, абонентов.",
+)
+def delete_tp(tp_id: UUID, session: Session = Depends(get_session)):
     try:
         tp = session.get(TP, tp_id)
         if not tp:
@@ -92,14 +109,20 @@ def delete_tp(tp_id: int, session: Session = Depends(get_session)):
         logging.error(f"ОШИБКА СВЯЗЕЙ БД: {e}")
         raise HTTPException(
             status_code=400,
-            detail=f"Нельзя удалить: есть связанные данные. Ошибка: {str(e)}")
+            detail=f"Нельзя удалить: есть связанные данные. Ошибка: {str(e)}",
+        )
     except Exception as e:
         session.rollback()
         logging.error(f"ОБЩАЯ ОШИБКА: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/by-number/{tp_number}", response_model=TPRead)
+@router.get(
+    "/by-number/{tp_number}",
+    response_model=TPRead,
+    summary="Получение ТП по ее номеру.",
+    description="Возврацает объект ТП с секциями и абонентами.",
+)
 def read_tp_by_number(tp_number: str, session: Session = Depends(get_session)):
     # Ищем ТП в базе по номеру
     statement = select(TP).where(TP.tp_number == tp_number)
@@ -107,40 +130,45 @@ def read_tp_by_number(tp_number: str, session: Session = Depends(get_session)):
     tp = results.first()
 
     if not tp:
-        raise HTTPException(status_code=404,
-                            detail=f"ТП с номером {tp_number} не найдена")
+        raise HTTPException(
+            status_code=404, detail=f"ТП с номером {tp_number} не найдена"
+        )
 
     return tp
 
 
-@router.patch("/{tp_id}", response_model=TPRead)
-def update_tp(
-        tp_id: int,
-        tp_data: dict,
-        session: Session = Depends(get_session)):
-    sync_references(tp_data, session)
+@router.patch(
+    "/{tp_id}",
+    response_model=TPUpdate,
+    description="Обновление данных по ТП, по ее номеру.",
+)
+def update_tp(tp_id: UUID, tp_data: TPUpdate, session: Session = Depends(get_session)):
+
+    update_dict = tp_data.model_dump(exclude_unset=True)
+    sync_references(update_dict, session)
+
     db_tp = session.get(TP, tp_id)
     if not db_tp:
         raise HTTPException(status_code=404, detail="ТП не найдена")
 
     # 1. Обработка даты (конвертация строки в объект date)
-    if "commissioning_date" in tp_data and isinstance(
-        tp_data
-        ["commissioning_date"],
-            str):
+    if "commissioning_date" in update_dict and isinstance(
+        update_dict["commissioning_date"], str
+    ):
         try:
-            tp_data["commissioning_date"] = date.fromisoformat(
-                tp_data["commissioning_date"])
+            update_dict["commissioning_date"] = date.fromisoformat(
+                update_dict["commissioning_date"]
+            )
         except ValueError:
             pass
 
     # 2. Обновляем основные поля ТП
-    for key, value in tp_data.items():
+    for key, value in update_dict.items():
         if key != "sections" and hasattr(db_tp, key):
             setattr(db_tp, key, value)
 
     # 3. Полная перезапись структуры секций, абонентов и шин
-    if "sections" in tp_data:
+    if "sections" in update_dict:
         # УДАЛЕНИЕ: Чистим всё старое дерево связей этой ТП
         for section in db_tp.sections:
             for sub in section.subscribers:
@@ -153,7 +181,7 @@ def update_tp(
         session.flush()
 
         # ВСТАВКА: Создаем новую структуру с чистого листа
-        for s_data in tp_data["sections"]:
+        for s_data in update_dict["sections"]:
             subs_data = s_data.pop("subscribers", [])
             s_data.pop("id", None)  # Игнорируем старые ID
 
@@ -165,8 +193,7 @@ def update_tp(
                 buses_data = sub_data.pop("buses", [])
                 sub_data.pop("id", None)  # Игнорируем старые ID
 
-                db_subscriber = Subscriber(
-                    **sub_data, section_id=db_section.id)
+                db_subscriber = Subscriber(**sub_data, section_id=db_section.id)
                 session.add(db_subscriber)
                 session.flush()  # Получаем новый ID абонента
 
@@ -201,12 +228,11 @@ def get_tp_link(tp_number: str, session: Session = Depends(get_session)):
     # 2. Если ТП не найдена — отдаем 404
     if not tp_record:
         raise HTTPException(
-            status_code=404, 
-            detail=f"ТП с номером {tp_number} не найдена в базе данных"
+            status_code=404, detail=f"ТП с номером {tp_number} не найдена в базе данных"
         )
 
     # 3. Проверяем, заполнено ли поле maps_nn
     # Если поле пустое, возвращаем None или пустую строку, фронтенд это обработает
     link = getattr(tp_record, "maps_nn", None)
-    
+
     return {"tp_number": tp_number, "maps_nn": link}

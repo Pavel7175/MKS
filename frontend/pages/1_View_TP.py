@@ -51,16 +51,16 @@ if "edit_data" not in st.session_state:
     st.session_state.edit_data = {}
 
 # search_query = st.text_input("🔍 Быстрый поиск по номеру ТП")
-search_query = st.text_input("🔍 Поиск ТП",
-                             placeholder="Введите номер ТП или адрес...")
+search_query = st.text_input("🔍 Поиск ТП", placeholder="Введите номер ТП или адрес...")
 
 # 2. Фильтрация списка (если что-то введено)
 tps_list = tps
 if search_query:
     tps_list = [
-        tp for tp in tps_list
-        if search_query.lower() in tp['tp_number'].lower()
-        or search_query.lower() in tp['address'].lower()
+        tp
+        for tp in tps_list
+        if search_query.lower() in tp["tp_number"].lower()
+        or search_query.lower() in tp["address"].lower()
     ]
     st.write(f"Найдено объектов: {len(tps_list)}")
 
@@ -89,7 +89,8 @@ except BaseException:
 @st.dialog("Удаление объекта")
 def delete_confirm_dialog(tp_to_delete):
     st.error(
-        f"Вы уверены, что хотите полностью удалить ТП №{tp_to_delete['tp_number']}?")
+        f"Вы уверены, что хотите полностью удалить ТП №{tp_to_delete['tp_number']}?"
+    )
     st.write(f"Адрес: {tp_to_delete['address']}")
 
     dcol1, dcol2 = st.columns(2)
@@ -105,7 +106,8 @@ def delete_confirm_dialog(tp_to_delete):
             st.rerun()  # Теперь просто перегружаем страницу со списком
         else:
             st.error(
-                f"Ошибка сервера: {res.json().get('detail', 'Неизвестная ошибка')}")
+                f"Ошибка сервера: {res.json().get('detail', 'Неизвестная ошибка')}"
+            )
 
 
 # 1. Поле поиска в самом верху
@@ -123,17 +125,21 @@ def delete_confirm_dialog(tp_to_delete):
 #     st.write(f"Найдено объектов: {len(tps_list)}")
 
 for tp in tps_list:
-    tp_id = tp['id']
+    tp_id = tp["id"]
     is_editing = st.session_state.edit_mode == tp_id
 
-    with st.expander(f"🏢 {tp['tp_number']} — {tp['address']}", expanded=is_editing or bool(search_query)):
+    with st.expander(
+        f"🏢 {tp['tp_number']} — {tp['address']}",
+        expanded=is_editing or bool(search_query),
+    ):
         if not is_editing:
             # --- ПРОСМОТР ---
             c1, c2, c3 = st.columns(3)
             c1.write(f"**Район/Округ:** {tp['district']} / {tp['region']}")
             c2.write(f"**Трансформатор:** {tp['transformer_type']}")
             c3.write(
-                f"**УСПД:** {tp['uspd_type']} | **Вкл:** {tp['commissioning_date']}")
+                f"**УСПД:** {tp['uspd_type']} | **Вкл:** {tp['commissioning_date']}"
+            )
 
             if st.button("📝 Редактировать", key=f"view_edit_{tp_id}"):
                 st.session_state.edit_mode = tp_id
@@ -145,11 +151,11 @@ for tp in tps_list:
             base_url = "https://disk.yandex.ru/client/disk/СТОК РД/МКС АСКУЭ ТП 2021/Рабочее проектирование/"
 
             # 2. Берем Район и Номер ТП из данных (ed)
-            dist = tp.get('district', '')
-            tp_num = tp.get('tp_number', '')
+            dist = tp.get("district", "")
+            tp_num = tp.get("tp_number", "")
 
             # 3. Отрисовка кнопок управления
-            c_space, c_docs, c_del = st.columns([0.6, 0.2, 0.2])
+            c_space, c_docs, _ = st.columns([0.6, 0.2, 0.2])
 
             if dist and tp_num:
                 # Собираем путь: база / Район / Номер ТП
@@ -160,45 +166,44 @@ for tp in tps_list:
                     "📂 Документы",
                     full_url,
                     use_container_width=True,
-                    help=f"Открыть папку ТП {tp_num} в районе {dist}"
+                    help=f"Открыть папку ТП {tp_num} в районе {dist}",
                 )
             else:
                 # Если чего-то не хватает, пишем подсказку
                 reason = "Нет района" if not dist else "Нет номера"
-                c_docs.button(
-                    f"📂 {reason}",
-                    disabled=True,
-                    use_container_width=True)
+                c_docs.button(f"📂 {reason}", disabled=True, use_container_width=True)
 
-            for sec in tp['sections']:
+            for sec in tp["sections"]:
                 with st.expander(f"📍 Луч: {sec['number']} (Панель: {sec['panel']})"):
                     st.write(f"**Тип сборки:** {sec['assembly_type']}")
-                    for sub in sec['subscribers']:
+                    for sub in sec["subscribers"]:
                         with st.container(border=True):
                             st.write(f"👤 **{sub['number']}** ({sub['name']})")
 
                             st.caption(
-                                f"ТТ: {sub['ct_type']} ({sub['ct_rating']}) | ПУ: {sub['meter_type']}")
-                            if sub.get('buses'):
+                                f"ТТ: {sub['ct_type']} ({sub['ct_rating']}) | ПУ: {sub['meter_type']}"
+                            )
+                            if sub.get("buses"):
                                 bus_list = [
                                     f"{b['bus_type']} ({b['bus_count']} шт.)"
-                                    for b in sub['buses']
-                                    if b.get('bus_type')]
+                                    for b in sub["buses"]
+                                    if b.get("bus_type")
+                                ]
                                 if bus_list:
                                     bus_str = ", ".join(bus_list)
                                     st.caption(f"**Шины:** {bus_str}")
 
         else:
-
             # --- Кнопка УДАЛЕНИЯ всей ТП (над формой редактирования) ---
             # Кнопка удаления
-
+            _, _, c_del = st.columns([0.6, 0.2, 0.2])
             # 2. Твоя кнопка удаления
             if c_del.button(
                 "🗑️ Удалить ТП",
                 key=f"del_tp_{tp_id}",
                 type="secondary",
-                    use_container_width=True):
+                use_container_width=True,
+            ):
                 delete_confirm_dialog(tp)
 
             # --- РЕДАКТИРОВАНИЕ ---
@@ -206,46 +211,54 @@ for tp in tps_list:
             ed = st.session_state.edit_data
 
             if st.button("➕ Добавить новый Луч", key=f"add_sec_{tp_id}"):
-                ed['sections'].append(
-                    {"number": "Новый", "assembly_type": "", "panel": "",
-                     "subscribers": []})
+                ed["sections"].append(
+                    {
+                        "number": "Новый",
+                        "assembly_type": "",
+                        "panel": "",
+                        "subscribers": [],
+                    }
+                )
                 st.rerun()
 
             with st.form(f"f_edit_{tp_id}"):
                 ed = tp_fields(ed)  # Поля ТП
 
-                for s_idx, sec in enumerate(ed['sections']):
+                for s_idx, sec in enumerate(ed["sections"]):
                     with st.expander(f"📍 Луч: {sec['number']}", expanded=True):
-
                         c_h, c_d = st.columns([0.9, 0.1])
-                        if c_d.form_submit_button(
-                                "🗑️", key=f"ds_{tp_id}_{s_idx}"):
-                            ed['sections'].pop(s_idx)
+                        if c_d.form_submit_button("🗑️", key=f"ds_{tp_id}_{s_idx}"):
+                            ed["sections"].pop(s_idx)
                             st.rerun()
 
                         # ДОБАВИЛИ ПАНЕЛЬ И СБОРКУ
-                        sec = section_fields(
-                            sec, key_prefix=f"es_{tp_id}_{s_idx}")
+                        sec = section_fields(sec, key_prefix=f"es_{tp_id}_{s_idx}")
 
-                        for a_idx, sub in enumerate(
-                                sec.get('subscribers', [])):
-                            with st.expander(f"👤 {sub['name'] if sub['name'] else 'Новый'}", expanded=False):
+                        for a_idx, sub in enumerate(sec.get("subscribers", [])):
+                            with st.expander(
+                                f"👤 {sub['name'] if sub['name'] else 'Новый'}",
+                                expanded=False,
+                            ):
                                 if st.form_submit_button(
                                     "❌ Удалить абонента",
-                                        key=f"dsub_{tp_id}_{s_idx}_{a_idx}"):
-                                    sec['subscribers'].pop(a_idx)
+                                    key=f"dsub_{tp_id}_{s_idx}_{a_idx}",
+                                ):
+                                    sec["subscribers"].pop(a_idx)
                                     st.rerun()
 
                                 sub = subscriber_fields(
-                                    sub, key_prefix=f"esub_{tp_id}_{s_idx}_{a_idx}")
+                                    sub, key_prefix=f"esub_{tp_id}_{s_idx}_{a_idx}"
+                                )
 
                                 # --- ШИНЫ ВНУТРИ АБОНЕНТА ---
                                 st.write("🔗 **Шины**")
                                 if st.form_submit_button(
-                                        "➕ Добавить шину", key=f"ab_{tp_id}_{s_idx}_{a_idx}"):
-                                    sub.setdefault(
-                                        'buses', []).append(
-                                        {"bus_type": "", "bus_count": 1})
+                                    "➕ Добавить шину",
+                                    key=f"ab_{tp_id}_{s_idx}_{a_idx}",
+                                ):
+                                    sub.setdefault("buses", []).append(
+                                        {"bus_type": "", "bus_count": 1}
+                                    )
                                     st.rerun()
 
                                 # for b_idx, bus in enumerate(
@@ -281,23 +294,29 @@ for tp in tps_list:
 
                                     # Передаем уникальный ID в функцию полей
                                     bc3 = bus_fields(
-                                        bus, key_prefix=f"bus_{b_unique_id}")
+                                        bus, key_prefix=f"bus_{b_unique_id}"
+                                    )
 
                                     # Кнопка удаления привязана к конкретному
                                     # ID, а не к позиции в списке
                                     if bc3.form_submit_button(
-                                            "❌", key=f"del_{b_unique_id}"):
+                                        "❌", key=f"del_{b_unique_id}"
+                                    ):
                                         # Удаляем из оригинального списка
                                         # именно эту шину по её ID
-                                        sub['buses'] = [
-                                            b for b in sub['buses'] if b.get('_id') != b_unique_id]
+                                        sub["buses"] = [
+                                            b
+                                            for b in sub["buses"]
+                                            if b.get("_id") != b_unique_id
+                                        ]
                                         st.rerun()
 
                         if st.form_submit_button(
                             "👤 Добавить абонента",
                             key=f"asb_{tp_id}_{s_idx}",
-                                use_container_width=True):
-                            sec['subscribers'].append(
+                            use_container_width=True,
+                        ):
+                            sec["subscribers"].append(
                                 {
                                     "number": "",
                                     "name": "",
@@ -308,18 +327,18 @@ for tp in tps_list:
                                     "ct_rating": "",
                                     "ct_type": "",
                                     "meter_type": "",
-                                    "buses": []})
+                                    "buses": [],
+                                }
+                            )
                             st.rerun()
 
                 sc1, sc2 = st.columns(2)
-                if sc1.form_submit_button(
-                        "✅ СОХРАНИТЬ", use_container_width=True):
+                if sc1.form_submit_button("✅ СОХРАНИТЬ", use_container_width=True):
                     res = requests.patch(f"{API_URL}/tps/{tp_id}", json=ed)
                     if res.status_code == 200:
                         st.success("Обновлено!")
                         st.session_state.edit_mode = None
                         st.rerun()
-                if sc2.form_submit_button(
-                        "❌ ОТМЕНА", use_container_width=True):
+                if sc2.form_submit_button("❌ ОТМЕНА", use_container_width=True):
                     st.session_state.edit_mode = None
                     st.rerun()

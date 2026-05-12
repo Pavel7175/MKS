@@ -35,27 +35,23 @@ tp = st.session_state.new_tp
 
 if st.button("➕ Добавить новый Луч"):
     tp["sections"].append(
-        {"number": f"Луч {len(tp['sections'])+1}", "subscribers": []})
+        {"number": f"Луч {len(tp['sections']) + 1}", "subscribers": []}
+    )
     st.rerun()
 
 with st.form("add_tp_form"):
     tp["tp_number"] = st.text_input("📝 Номер ТП", value=tp["tp_number"])
-    tp_number=tp["tp_number"] 
+    tp_number = tp["tp_number"]
     if tp_number:
         try:
             check_res = requests.get(f"{API_URL}/tps/check-number/{tp_number}")
             if check_res.status_code == 200 and check_res.json().get("exists"):
-                st.error(
-                    f"⚠️ Внимание! ТП №{tp_number} уже зарегистрирована в системе.")
+                st.error(f"⚠️ Внимание! ТП №{tp_number} уже зарегистрирована в системе.")
                 st.stop()  # Здесь выполнение прервется, форма ниже не появится
             else:
                 tp["tp_number"] = tp_number
         except BaseException:
             pass
-
-
-
-
 
     tp.update(tp_fields(tp))
 
@@ -68,8 +64,7 @@ with st.form("add_tp_form"):
                 with st.container(border=True):
                     sub_id = f"{s_idx}_{a_idx}"
                     if sub_id not in st.session_state.sub_salts:
-                        st.session_state.sub_salts[sub_id] = str(uuid.uuid4())[
-                            :8]
+                        st.session_state.sub_salts[sub_id] = str(uuid.uuid4())[:8]
 
                     salt = st.session_state.sub_salts[sub_id]
 
@@ -78,34 +73,34 @@ with st.form("add_tp_form"):
 
                     # Логика кнопок управления
                     if c_cp.form_submit_button(
-                            "📋 Копировать", key=f"cp_{sub_id}_{salt}"):
+                        "📋 Копировать", key=f"cp_{sub_id}_{salt}"
+                    ):
                         st.session_state.sub_buffer = copy.deepcopy(sub)
                         st.toast("Данные скопированы")
 
                     if c_ps.form_submit_button(
-                            "📥 Вставить", key=f"ps_{sub_id}_{salt}"):
+                        "📥 Вставить", key=f"ps_{sub_id}_{salt}"
+                    ):
                         if st.session_state.sub_buffer:
                             # Вставляем полную копию
-                            st.session_state.new_tp["sections"][s_idx][
-                                "subscribers"][a_idx] = copy.deepcopy(
-                                st.session_state.sub_buffer)
+                            st.session_state.new_tp["sections"][s_idx]["subscribers"][
+                                a_idx
+                            ] = copy.deepcopy(st.session_state.sub_buffer)
                             # Меняем соль для обновления экрана
-                            st.session_state.sub_salts[sub_id] = str(uuid.uuid4())[
-                                :8]
+                            st.session_state.sub_salts[sub_id] = str(uuid.uuid4())[:8]
                             st.rerun()
                         else:
                             st.warning("Буфер пуст!")
 
-                    if c_dl.form_submit_button(
-                            "🗑️", key=f"dl_{sub_id}_{salt}"):
+                    if c_dl.form_submit_button("🗑️", key=f"dl_{sub_id}_{salt}"):
                         sec["subscribers"].pop(a_idx)
                         st.rerun()
 
                     # --- ОТРИСОВКА (Всегда идет после логики кнопок) ---
                     # Поля абонента
                     sub.update(
-                        subscriber_fields(
-                            sub, key_prefix=f"sub_{sub_id}_{salt}"))
+                        subscriber_fields(sub, key_prefix=f"sub_{sub_id}_{salt}")
+                    )
 
                     # Шины абонента
                     st.write("🔗 **Шины**")
@@ -115,22 +110,18 @@ with st.form("add_tp_form"):
                         if "_uuid" not in bus:
                             bus["_uuid"] = str(uuid.uuid4())
 
-                        bus_fields(
-                            bus, key_prefix=f"bus_{bus['_uuid']}_{salt}")
+                        bus_fields(bus, key_prefix=f"bus_{bus['_uuid']}_{salt}")
 
                     if st.form_submit_button(
-                            "➕ Добавить шину", key=f"add_bus_{sub_id}_{salt}"):
-                        sub.setdefault(
-                            "buses", []).append(
-                            {"bus_type": "", "bus_count": 1,
-                             "_uuid": str(uuid.uuid4())})
+                        "➕ Добавить шину", key=f"add_bus_{sub_id}_{salt}"
+                    ):
+                        sub.setdefault("buses", []).append(
+                            {"bus_type": "", "bus_count": 1, "_uuid": str(uuid.uuid4())}
+                        )
                         st.rerun()
 
-            if st.form_submit_button(
-                "👤 Добавить абонента",
-                    key=f"as_btn_{s_idx}"):
-                sec["subscribers"].append(
-                    {"name": "", "number": "", "buses": []})
+            if st.form_submit_button("👤 Добавить абонента", key=f"as_btn_{s_idx}"):
+                sec["subscribers"].append({"name": "", "number": "", "buses": []})
                 st.rerun()
 
     # --- ЭТОТ БЛОК ДОЛЖЕН БЫТЬ ВНУТРИ with st.form ---
@@ -163,7 +154,16 @@ with st.form("add_tp_form"):
                 if res.status_code == 200:
                     if "prefill_tp" in st.session_state:
                         task_id = st.session_state.prefill_tp["id"]
-                        requests.delete(f"{API_URL}/tasks/{task_id}")
+
+                        # requests.delete(f"{API_URL}/tasks/{task_id}")
+                        try:
+                            upd_status = {"status": "Формирование РД"}
+                            requests.patch(
+                                f"{API_URL}/tasks/{task_id}", json=upd_status
+                            )
+                        except Exception as e:
+                            st.error(f"Не удалось обновить статус: {e}")
+
                         del st.session_state.prefill_tp
                     st.success(f"✅ ТП {tp['tp_number']} успешно сохранена!")
                     st.session_state.new_tp = {"tp_number": "", "sections": []}
@@ -174,7 +174,9 @@ with st.form("add_tp_form"):
                     error_msg = res.json().get("detail", "Ошибка валидации")
                     st.error(f"🚫 {error_msg}")
                 else:
-                    st.error("❌ Непредвиденная ошибка при сохранении")
+                    st.error(
+                        f"❌ Непредвиденная ошибка при сохранении {res.status_code}"
+                    )
 
             except Exception as e:
                 st.error(f"📡 Ошибка связи с сервером: {e}")

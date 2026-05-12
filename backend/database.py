@@ -2,19 +2,18 @@ import os
 
 from argon2 import PasswordHasher
 from dotenv import load_dotenv
+from models.base import Base
 
 # Импортируем модели, чтобы SQLModel зарегистрировал их в метаданных
-from models import (  # noqa
-    TP,
-    Bus,
-    Reference,
-    Section,
-    Subscriber,
-    User,  # Убедись, что путь к модели User верный
-)
+from models.bus import Bus  # noqa
+from models.reference import Reference  # noqa
+from models.section import Section  # noqa
+from models.subscriber import Subscriber  # noqa
+from models.tp import TP  # noqa
+from models.user import User  # noqa
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, create_engine, select
 
 load_dotenv()
 # Создаем объект ph, у которого есть метод .hash()
@@ -28,7 +27,7 @@ engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
     # Теперь эта команда создаст все таблицы: tp, section, subscriber и bus
-    SQLModel.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 
 
 def get_session():
@@ -41,7 +40,6 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
-
 
 
 def init_admin():
@@ -60,7 +58,8 @@ def init_admin():
             new_admin = User(
                 username=admin_login,
                 password_hash=hashed_pw,
-                role="admin"
+                role="admin",
+                nickname="admin",
             )
             session.add(new_admin)
             session.commit()

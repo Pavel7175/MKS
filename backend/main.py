@@ -34,5 +34,3 @@ app.include_router(visio.router)
 @app.get("/")
 def read_root():
     return {"message": "Система учета ТП работает"}
-
-
